@@ -22,6 +22,7 @@ git clone --recurse-submodules https://gitlab.com/FlibidyDibidy/graphite.git
 
 Linux
 -----
+#### One time setup
 Install dependencies (TODO add others)
 ```
 sudo apt install build-essential cmake git \
@@ -59,14 +60,47 @@ make all
 sudo make install
 ```
 
-Then build this
+#### Build
 ```
 mkdir build && cd build
 cmake ..
 ```
 
+```
+make
+```
+
 Windows
 -------
-Yikes
+#### One time setup
+- Install Visual Studio 2019 community edition, other versions might work
+- Install cmake for windows: cmake.org/download, add to path for ease
+- Download and install [zlib](http://gnuwin32.sourceforge.net/packages/zlib.htm)
+    - Complete package, except sources (Setup)
+    - Keep track of the install directory, by default it's something like: "C:/Program Files (x86)/GnuWin32/"
+    - This is a dependency of nestopia
+- Download and install [sdl2](https://www.libsdl.org/download-2.0.php)
+    - SDL2-devel-2.0.16-VC.zip, then unzip it
+    - Keep track of the final directory, I put mine in "C:/sdl2"
+- Download and install [opencv](https://opencv.org/releases/)
+    - Click: Windows, Download it, Run the executable
+    - I extracted to "C:\opencv"
+- Download and install [glew](http://glew.sourceforge.net/index.html)
+    - Windows 32-bit and 64-bit, then unzip it
+    - Keep track of the final directory, I put mine in "C:/glew"
+
+#### Build
+```
+mkdir build
+cd build
+cmake -G "Visual Studio 16 2019" -A x64 .. define variables!
+"C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvarsall.bat" amd64
+```
+
+
+```
+msbuild ALL_BUILD.vcxprox
+```
+
 
 
