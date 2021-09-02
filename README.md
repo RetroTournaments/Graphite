@@ -15,7 +15,6 @@ Build Instructions
 ------------------
 
 Obtain the source
-
 ```
 git clone --recurse-submodules https://gitlab.com/FlibidyDibidy/graphite.git
 ```
@@ -30,7 +29,7 @@ sudo apt install build-essential cmake git \
 ```
 
 
-Install opencv (from source preferred)
+Install opencv
 ```
 cd ~/3rdRepos/
 git clone https://github.com/opencv/opencv.git
@@ -67,24 +66,19 @@ Windows
 - Install cmake for windows: cmake.org/download, add to path for ease
 - Download and install [opencv](https://opencv.org/releases/)
     - Click: Windows, Download it, Run the executable
-    - I extracted to "C:\opencv"
+    - extract to "C:\opencv"
 
 #### Build
 ```
-mkdir build
-cd build
-cmake -G "Visual Studio 16 2019" -A x64 .. define variables!
 "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvarsall.bat" amd64
 ```
 
+```
+mkdir build
+cd build
+cmake -G "Visual Studio 16 2019" -A x64
+```
 
 ```
-msbuild ALL_BUILD.vcxprox
+msbuild ALL_BUILD.vcxprox /p:Configuration=Release
 ```
-
-
-gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 wine64 gcc-multilib
-x86_64-w64-mingw32-gcc
-x86_64-w64-mingw32-g++
-
-cmake -D CMAKE_C_COMPILER=x86_64-w64-mingw32-gcc -D CMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++ ..

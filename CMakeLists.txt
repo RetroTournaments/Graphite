@@ -25,10 +25,12 @@ cmake_policy(SET CMP0012 NEW)
 project(Graphite)
 
 if (WIN32)
+    find_package(OpenGL REQUIRED)
+    find_package(OpenCV CONFIG REQUIRED PATHS "C:/opencv/opencv/build")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc /O2 /std:c++20")
 else()
+    find_package(OpenCV REQUIRED)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++20 -Wno-sign-conversion")
-
 endif()
 
 

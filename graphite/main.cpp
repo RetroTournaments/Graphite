@@ -20,6 +20,10 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 #include <iostream>
 
 #include "graphite/graphite.h"
@@ -31,6 +35,7 @@ int main(int argc, char** argv) {
     util::ArgNext(&argc, &argv); // Skip path argument
 
     GraphiteConfig config = GraphiteConfig::Defaults();
+
     try {
         ParseArgumentsToConfig(&argc, &argv, &config);
     } catch (std::runtime_error e) {
@@ -46,3 +51,9 @@ int main(int argc, char** argv) {
     return 0;
 }
 
+#ifdef _WIN32
+int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmdshow)
+{
+    return main(__argc, __argv);
+}
+#endif

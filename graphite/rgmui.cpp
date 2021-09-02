@@ -20,6 +20,11 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 
+#ifdef _WIN32
+#include <windows.h>
+#define GL_BGR 0x80E0
+#endif
+
 #include "graphite/rgmui.h"
 #include "GL/gl.h"
 

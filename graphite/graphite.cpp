@@ -29,7 +29,7 @@
 #include "graphite/graphite.h"
 #include "graphite/nestopiaimpl.h"
 
-#include "graphite/libavimpl.h"
+//#include "graphite/libavimpl.h"
 
 using namespace graphite;
 
@@ -898,9 +898,9 @@ VideoComponent::VideoComponent(rgmui::EventQueue* queue,
         FindTargetFrame(v);
     });
 
-    m_VideoThread = std::make_unique<video::LiveInputThread>(
-                std::make_unique<video::LibAVLiveInput>(videoPath),
-                m_Config.MaxFrames, false);
+    //m_VideoThread = std::make_unique<video::LiveInputThread>(
+    //            std::make_unique<video::LibAVLiveInput>(videoPath),
+    //            m_Config.MaxFrames, false);
     SetBlankImage();
 }
 

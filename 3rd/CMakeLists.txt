@@ -70,6 +70,16 @@ add_subdirectory(googletest)
 # zlib
 ################################################################################
 add_subdirectory(zlib)
+set(ZLIB_INCLUDE_DIR
+    "${CMAKE_CURRENT_SOURCE_DIR}/zlib/"
+    "${CMAKE_BINARY_DIR}/3rd/zlib/"
+    PARENT_SCOPE
+)
+set(ZLIB_INCLUDE_DIR
+    "${CMAKE_CURRENT_SOURCE_DIR}/zlib/"
+    "${CMAKE_BINARY_DIR}/3rd/zlib/"
+)
+
 
 ################################################################################
 # nestopia
@@ -91,51 +101,3 @@ set(fmt_INCLUDE_DIRS
     PARENT_SCOPE
 )
 
-################################################################################
-# opencv
-################################################################################
-add_subdirectory(opencv)
-set(OpenCV_INCLUDE_DIRS
-    "${CMAKE_CURRENT_SOURCE_DIR}/opencv/include/"
-    "${CMAKE_CURRENT_SOURCE_DIR}/opencv/modules/calib3d/include/"
-    "${CMAKE_CURRENT_SOURCE_DIR}/opencv/modules/core/include/"
-    "${CMAKE_CURRENT_SOURCE_DIR}/opencv/modules/dnn/include/"
-    "${CMAKE_CURRENT_SOURCE_DIR}/opencv/modules/features2d/include/"
-    "${CMAKE_CURRENT_SOURCE_DIR}/opencv/modules/flann/include/"
-    "${CMAKE_CURRENT_SOURCE_DIR}/opencv/modules/gapi/include/"
-    "${CMAKE_CURRENT_SOURCE_DIR}/opencv/modules/highgui/include/"
-    "${CMAKE_CURRENT_SOURCE_DIR}/opencv/modules/imgcodecs/include/"
-    "${CMAKE_CURRENT_SOURCE_DIR}/opencv/modules/imgproc/include/"
-    "${CMAKE_CURRENT_SOURCE_DIR}/opencv/modules/java/include/"
-    "${CMAKE_CURRENT_SOURCE_DIR}/opencv/modules/js/include/"
-    "${CMAKE_CURRENT_SOURCE_DIR}/opencv/modules/ml/include/"
-    "${CMAKE_CURRENT_SOURCE_DIR}/opencv/modules/objc/include/"
-    "${CMAKE_CURRENT_SOURCE_DIR}/opencv/modules/objdetect/include/"
-    "${CMAKE_CURRENT_SOURCE_DIR}/opencv/modules/photo/include/"
-    "${CMAKE_CURRENT_SOURCE_DIR}/opencv/modules/python/include/"
-    "${CMAKE_CURRENT_SOURCE_DIR}/opencv/modules/stitching/include/"
-    "${CMAKE_CURRENT_SOURCE_DIR}/opencv/modules/ts/include/"
-    "${CMAKE_CURRENT_SOURCE_DIR}/opencv/modules/video/include/"
-    "${CMAKE_CURRENT_SOURCE_DIR}/opencv/modules/videoio/include/"
-    "${CMAKE_CURRENT_SOURCE_DIR}/opencv/modules/world/include/"
-    "${CMAKE_BINARY_DIR}"
-    PARENT_SCOPE
-)
-set(OpenCV_LIBRARIES
-    opencv_calib3d
-    opencv_core
-    opencv_dnn
-    opencv_features2d
-    opencv_flann
-    opencv_gapi
-    opencv_highgui
-    opencv_imgcodecs
-    opencv_imgproc
-    opencv_ml
-    opencv_objdetect
-    opencv_photo
-    opencv_stitching
-    opencv_videoio
-    opencv_video
-    PARENT_SCOPE
-)

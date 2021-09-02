@@ -88,10 +88,13 @@ target_link_libraries(rgmuilib
     ${OpenCV_LIBRARIES}
     fmt::fmt
 )
-if (WIN32)
-else()
+if (UNIX)
     target_link_libraries(rgmuilib
         pthread GL dl
+    )
+else()
+    target_link_libraries(rgmuilib
+        ${OPENGL_LIBRARIES}
     )
 endif()
 
@@ -103,17 +106,32 @@ add_library(graphitelib
     graphite.cpp
 )
 target_link_libraries(graphitelib
-    neslib rgmuilib videolib videolibextra
+    neslib rgmuilib videolib 
 )
+if (UNIX)
+    target_link_libraries(rgmuilib
+        videolibextra
+    )
+endif()
 
 ################################################################################
 # Graphite
 #   - The actual executable
 ################################################################################
-add_executable(graphite
-    main.cpp
-)
-target_link_libraries(graphite
-    graphitelib
-)
+if (UNIX)
+    add_executable(graphite
+        main.cpp
+    )
+    target_link_libraries(graphite
+        graphitelib
+    )
+else()
+    add_executable(graphite WIN32
+        main.cpp
+    )
+    target_link_libraries(graphite
+        graphitelib
+    )
+
+endif()
 
