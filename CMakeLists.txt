@@ -24,7 +24,13 @@ cmake_policy(SET CMP0012 NEW)
 
 project(Graphite)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++20")
+if (WIN32)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc /O2 /std:c++20")
+else()
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++20 -Wno-sign-conversion")
+
+endif()
+
 
 add_subdirectory(3rd)
 include_directories(.)

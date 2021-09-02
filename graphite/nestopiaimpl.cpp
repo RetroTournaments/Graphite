@@ -148,7 +148,7 @@ uint64_t NestopiaNESEmulator::CurrentFrame() const {
 uint8_t NestopiaNESEmulator::CPUPeek(uint16_t addr) const {
     Nes::Core::Machine& machine(const_cast<Nes::Api::Emulator&>(m_Emulator));
     Nes::Core::Cpu& cpu = machine.cpu;
-    return static_cast<uint8_t>(cpu.Peek(static_cast<uint>(addr)));
+    return static_cast<uint8_t>(cpu.Peek(static_cast<int>(addr)));
 }
 
 uint8_t NestopiaNESEmulator::PPUPeek8(uint16_t addr) const {

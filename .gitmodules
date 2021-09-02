@@ -7,3 +7,12 @@
 [submodule "3rd/fmt"]
 	path = 3rd/fmt
 	url = https://github.com/fmtlib/fmt.git
+[submodule "3rd/SDL"]
+	path = 3rd/SDL
+	url = https://github.com/libsdl-org/SDL.git
+[submodule "3rd/opencv"]
+	path = 3rd/opencv
+	url = https://github.com/opencv/opencv.git
+[submodule "3rd/zlib"]
+	path = 3rd/zlib
+	url = https://github.com/madler/zlib.git

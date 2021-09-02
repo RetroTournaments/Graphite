@@ -19,7 +19,7 @@
 ## Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 ##
 ################################################################################
-cmake_minimum_required(VERSION 2.6)
+cmake_minimum_required(VERSION 3.6)
 project(graphite)
 
 ################################################################################
@@ -28,7 +28,8 @@ project(graphite)
 #   - No dependencies allowed (other than 3rdnestopia)
 ################################################################################
 add_library(neslib
-    nes nestopiaimpl
+    nes.cpp 
+    nestopiaimpl.cpp
 )
 target_include_directories(neslib PUBLIC
     ${nestopia_INCLUDE_DIRS}
@@ -43,7 +44,7 @@ target_link_libraries(neslib
 #     shared utilities related to time / strings / memory and that nonsense
 ################################################################################
 add_library(utillib
-    util
+    util.cpp
 )
 
 ################################################################################
@@ -51,51 +52,58 @@ add_library(utillib
 #   - Library for working with video streams
 ################################################################################
 add_library(videolib
-    video
+    video.cpp
 )
 target_link_libraries(videolib
     utillib
-    avformat avcodec avutil swscale pthread
-    v4l1 v4l2
     fmt::fmt
 )
-
+if (UNIX)
+    add_library(videolibextra
+        libavimpl.cpp
+        v4l2impl.cpp
+    )
+    target_link_libraries(videolibextra
+        v4l1 v4l2 avformat avcodec avutil swscale pthread fmt::fmt
+    )
+endif()
 
 ################################################################################
 # RGMUI Lib
 #   - Library with useful utilities for creating my style of user interfaces
 #     with imgui, event queue communication, opencv integration, etc.
 ################################################################################
-find_package(SDL2       REQUIRED)
-find_package(OpenCV     REQUIRED)
-find_package(GLEW       REQUIRED)
 add_library(rgmuilib
-    rgmui
+    rgmui.cpp
 )
 target_include_directories(rgmuilib PUBLIC
     ${Imgui_INCLUDE_DIRS}
     ${SDL2_INCLUDE_DIRS}
-    ${GLEW_INCLUDE_DIRS}
     ${fmt_INCLUDE_DIRS}
+    ${OpenCV_INCLUDE_DIRS}
 )
 target_link_libraries(rgmuilib
-    pthread utillib 3rdimgui 
-    GL dl
-    ${SDL2_LIBRARIES}
-    ${OpenCV_LIBS}
-    ${GLEW_LIBRARIES}
+    utillib 3rdimgui 
+    SDL2 
+    ${OpenCV_LIBRARIES}
     fmt::fmt
 )
+if (WIN32)
+else()
+    target_link_libraries(rgmuilib
+        pthread GL dl
+    )
+endif()
 
 ################################################################################
 # Graphite Lib
 #   - The library with all the components and such that make graphite a thing
 ################################################################################
 add_library(graphitelib
-    graphite
+    graphite.cpp
 )
 target_link_libraries(graphitelib
-    neslib rgmuilib videolib
+    neslib rgmuilib videolib videolibextra
 )
 
 ################################################################################
@@ -103,7 +111,7 @@ target_link_libraries(graphitelib
 #   - The actual executable
 ################################################################################
 add_executable(graphite
-    main
+    main.cpp
 )
 target_link_libraries(graphite
     graphitelib

@@ -29,6 +29,8 @@
 #include "graphite/graphite.h"
 #include "graphite/nestopiaimpl.h"
 
+#include "graphite/libavimpl.h"
+
 using namespace graphite;
 
 GraphiteConfig GraphiteConfig::Defaults() {
@@ -181,8 +183,8 @@ InputsComponent::InputsComponent(rgmui::EventQueue* queue,
         if (q < 0) {
             q = 0;
         }
-        if (q >= m_Inputs.size()) {
-            q = m_Inputs.size() - 1;
+        if (q >= static_cast<int>(m_Inputs.size())) {
+            q = static_cast<int>(m_Inputs.size()) - 1;
         }
 
         ChangeTargetTo(q);
@@ -542,10 +544,10 @@ void InputsComponent::OnFrame() {
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
 
-        ImGui::BeginChild("buttons", ImVec2(0, 0), ImGuiWindowFlags_NoMove);
+        ImGui::BeginChild("buttons", ImVec2(0, 0), true, ImGuiWindowFlags_NoMove);
 
         ImGuiListClipper clipper;
-        clipper.Begin(m_Inputs.size());
+        clipper.Begin(static_cast<int>(m_Inputs.size()));
         while (clipper.Step()) {
             ImVec2 p = ImGui::GetCursorScreenPos();
             DoInputList(p, clipper.DisplayStart, clipper.DisplayEnd);
@@ -565,7 +567,8 @@ void InputsComponent::OnFrame() {
 
         if (ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
             if (!m_Drag.HighlightedFrames.empty()) {
-                m_UndoRedo.ConsolidateLast(m_Drag.HighlightedFrames.size());
+                m_UndoRedo.ConsolidateLast(
+                        static_cast<int>(m_Drag.HighlightedFrames.size()));
             }
             m_Drag.Clear();
             m_TargetDragging = false;

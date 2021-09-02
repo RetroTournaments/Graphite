@@ -34,23 +34,10 @@
 #include <chrono>
 #include <queue>
 
-extern "C" {
-#include "libavcodec/avcodec.h"
-#include "libavformat/avformat.h"
-#include "libswscale/swscale.h"
-#include "libavutil/imgutils.h"
-#include "libavutil/avutil.h"
-#include "libavutil/time.h"
-#include "libavutil/opt.h"
-}
-#include "libv4l2.h"
-#include "linux/videodev2.h"
 
 #include "graphite/util.h"
 
 namespace graphite::video {
-
-std::string AVStringError(int retcode);
 
 enum class LiveGetResult {
     AGAIN,
@@ -191,14 +178,10 @@ private:
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-class LibAVLiveInput : public ILiveInput {
+class OpenCVInput : public ILiveInput {
 public:
-    // As: "https://blahblahblah.m3u8"
-    // or: "http://127.0.0.1:34613/" (remember:
-    //  streamlink --twitch-disable-ads --twitch-low-latency twitch.tv/blah 720p60 
-    //      --player-external-http)
-    LibAVLiveInput(const std::string& input); 
-    ~LibAVLiveInput();
+    OpenCVInput(const std::string& input); 
+    ~OpenCVInput();
 
     int Width() const override final;
     int Height() const override final;
@@ -210,59 +193,11 @@ public:
     std::string Information() override final;
 
 private:
-    void Open();
-    void Close();
-    void ReportError(const std::string& func, int retcode);
-
-private:
     std::string m_Input;
-    std::string m_LastError, m_Information;
+    //std::unique_ptr<cv:videoCapture> m_Capture;
 
-    AVFormatContext* m_AVFormatContext;
-    AVCodecContext* m_AVCodecContext;
-    SwsContext* m_SwsContext;
-    int m_InputIndex;
-
-    AVFrame* m_Picture;
-    AVFrame* m_BGRPicture;
-    int m_NumBytes;
-    uint8_t* m_Buffer;
 };
 
-////////////////////////////////////////////////////////////////////////////////
-//
-////////////////////////////////////////////////////////////////////////////////
-
-class V4L2LiveInput : public ILiveInput {
-public:
-    // As: "/dev/videoX"
-    V4L2LiveInput(const std::string& input); 
-    ~V4L2LiveInput();
-
-    int Width() const override final;
-    int Height() const override final;
-
-    LiveGetResult Get(uint8_t* buffer, int64_t* ptsMilliseconds) override final;
-    void Reopen() override final;
-    void ClearError() override final;
-    std::string LastError() override final;
-    std::string Information() override final;
-
-private:
-    void Open();
-    void Close();
-
-
-private:
-    std::string m_Input;
-    std::string m_LastError, m_Information;
-    int m_FileDescriptor;
-    int m_Width, m_Height;
-    std::vector<v4l2_buffer> m_BufferInfos;
-    std::vector<void*> m_Buffers;
-    v4l2_buffer m_GetBuffer;
-    bool m_Streamon;
-};
 
 }
 

@@ -24,11 +24,6 @@
 #include <cassert>
 #include <sstream>
 
-#include <fcntl.h>
-#include <unistd.h>
-#include <sys/ioctl.h>
-#include <sys/mman.h>
-#include <string.h>
 
 #include "fmt/core.h"
 
@@ -36,12 +31,6 @@
 
 using namespace graphite::video;
 
-std::string graphite::video::AVStringError(int retcode) {
-    char errbuf[1024] = { 0 };
-    av_strerror(retcode, errbuf, 1024);
-    std::string err(errbuf);
-    return err;
-}
 
 ILiveInput::ILiveInput() {
 }
@@ -161,7 +150,7 @@ void LiveInputThread::ProcessReadFrame(LiveInputFramePtr p) {
     m_NumReadFramesSinceLastReset++;
     {
         std::lock_guard<std::mutex> lock(m_SharedMutex);
-        if (m_Queue.size() >= m_QueueCapacity && m_AllowDiscard) {
+        if (static_cast<int>(m_Queue.size()) >= m_QueueCapacity && m_AllowDiscard) {
             m_NumDiscardedFramesSinceLastReset++;
             m_NumDiscardedFrames++;
             m_Queue.pop_front();
@@ -207,7 +196,7 @@ void LiveInputThread::WatchingThread() {
             bool queueFull = false;
             {
                 std::lock_guard<std::mutex> lock(m_SharedMutex);
-                queueFull = m_Queue.size() >= m_QueueCapacity;
+                queueFull = static_cast<int>(m_Queue.size()) >= m_QueueCapacity;
             }
 
             if (queueFull) {
@@ -319,428 +308,40 @@ void LiveInputThread::SetQueueCapacity(int64_t capacity) {
     m_QueueCapacity = capacity;
 }
 
-
 ////////////////////////////////////////////////////////////////////////////////
 
-LibAVLiveInput::LibAVLiveInput(const std::string& input)
-    : m_Input(input) 
-    , m_AVFormatContext(nullptr)
-    , m_AVCodecContext(nullptr)
-    , m_SwsContext(nullptr)
-    , m_Picture(nullptr)
-    , m_BGRPicture(nullptr)
-    , m_Buffer(nullptr) 
-    , m_InputIndex(-1) {
-    av_log_set_level(AV_LOG_ERROR);
-    Open();
-}
-
-LibAVLiveInput::~LibAVLiveInput() {
-    Close();
-}
-
-static int InterruptCallback(void* opaque) {
-    return 0;
-}
-
-void LibAVLiveInput::ReportError(const std::string& func, int retcode) {
-    std::ostringstream os;
-    os <<  "[ERROR] in " << func << std::endl
-       << "  " << AVStringError(retcode) << std::endl;
-    m_LastError = os.str();
-}
-
-void LibAVLiveInput::Open() {
-    assert(m_AVFormatContext == nullptr);
-    assert(m_AVCodecContext == nullptr);
-    assert(m_SwsContext == nullptr);
-    assert(m_InputIndex == -1);
-
-    // Open the input and find stream info
-    AVDictionary* dict = nullptr;
-
-    av_dict_set(&dict, "rtsp_transport", "tcp", 0);
-    int ret = avformat_open_input(&m_AVFormatContext, m_Input.c_str(), nullptr, &dict);
-    av_dict_free(&dict);
-    if (ret != 0) return ReportError("avformat_open_input", ret);
-
-    ret = avformat_find_stream_info(m_AVFormatContext, nullptr);
-    if (ret != 0) return ReportError("avformat_find_stream_info", ret);
-
-    // Set up for interruptions
-    assert(m_AVFormatContext);
-    // TODO
-    m_AVFormatContext->interrupt_callback.callback = InterruptCallback;
-    m_AVFormatContext->interrupt_callback.opaque = this;
-
-    // Find the 'video' stream and the appropriate codec
-    assert(m_AVCodecContext == nullptr);
-    assert(m_InputIndex == -1);
-    for (int i = 0; i < m_AVFormatContext->nb_streams; i++) {
-        AVCodecContext* avctx = avcodec_alloc_context3(nullptr);
-
-        ret = avcodec_parameters_to_context(avctx, m_AVFormatContext->streams[i]->codecpar);
-        if (ret != 0) return ReportError("avcodec_parameters_to_context", ret);
-
-        avctx->pkt_timebase = m_AVFormatContext->streams[i]->time_base;
-
-        AVCodec* codec = avcodec_find_decoder(avctx->codec_id);
-        if (avctx->codec_type == AVMEDIA_TYPE_VIDEO) {
-            ret = avcodec_open2(avctx, codec, nullptr);
-            if (ret != 0) return ReportError("avcodec_open2", ret);
-
-            m_InputIndex = i;
-            m_AVCodecContext = avctx;
-
-            uint32_t width = avctx->width;
-            uint32_t height = avctx->height;
-
-            m_SwsContext = sws_getContext(width, height, m_AVCodecContext->pix_fmt,
-                    width, height, AV_PIX_FMT_BGR24,
-                    SWS_BICUBIC, NULL, NULL, NULL);
-
-            m_Picture = av_frame_alloc();
-            m_BGRPicture = av_frame_alloc();
-            m_NumBytes = av_image_get_buffer_size(AV_PIX_FMT_BGR24, width, height, 1);
-            m_Buffer = (uint8_t *) av_malloc(m_NumBytes * sizeof(uint8_t));
-
-            av_image_fill_arrays(
-                    m_BGRPicture->data, m_BGRPicture->linesize,
-                    m_Buffer, AV_PIX_FMT_BGR24, width, height, 1);
-            break;
-        } else {
-            avcodec_free_context(&avctx);
-        }
-    }
-    for (int i = 0; i < m_AVFormatContext->nb_streams; i++) {
-        if (i != m_InputIndex) {
-            m_AVFormatContext->streams[i]->discard = AVDISCARD_ALL;
-        }
-    }
-
-    m_Information = fmt::format("LibAVInput: {}\n{}x{}", m_Input,
-            Width(), Height());
-}
-
-void LibAVLiveInput::Close() {
-    if (m_AVFormatContext) {
-        avformat_close_input(&m_AVFormatContext);
-        m_AVFormatContext = nullptr;
-    }
-    if (m_AVCodecContext) {
-        avcodec_free_context(&m_AVCodecContext);
-        m_AVCodecContext = nullptr;
-    }
-    if (m_SwsContext) {
-        sws_freeContext(m_SwsContext);
-        m_SwsContext = nullptr;
-    }
-    if (m_Picture) {
-        av_frame_unref(m_Picture);
-        av_frame_free(&m_Picture);
-        m_Picture = nullptr;
-    }
-    if (m_BGRPicture) {
-        av_frame_unref(m_BGRPicture);
-        av_frame_free(&m_BGRPicture);
-        m_BGRPicture = nullptr;
-    }
-    if (m_Buffer) {
-        av_free(m_Buffer);
-        m_Buffer = nullptr;
-    }
-    m_InputIndex = -1;
-}
-
-int LibAVLiveInput::Width() const {
-    if (m_AVCodecContext) {
-        return m_AVCodecContext->width;
-    }
-    return 0;
-}
-
-int LibAVLiveInput::Height() const {
-    if (m_AVCodecContext) {
-        return m_AVCodecContext->height;
-    }
-    return 0;
-}
-
-LiveGetResult LibAVLiveInput::Get(uint8_t* buffer, int64_t* ptsMilliseconds) {
-    if (m_AVFormatContext == nullptr ||
-        m_AVCodecContext == nullptr ||
-        m_SwsContext == nullptr ||
-        m_InputIndex < 0) {
-        if (m_LastError == "") {
-            m_LastError = "[ERROR] in LibAVLiveInput::Get\n  Input is not open?";
-        }
-        return LiveGetResult::FAILURE;
-    }
-    if (m_LastError != "") {
-        return LiveGetResult::FAILURE;
-    }
-
-    AVPacket* packet = av_packet_alloc();
-    double pts = 0;
-
-    int gotFrame = 0;
-    int ret = av_read_frame(m_AVFormatContext, packet);
-    if (ret == AVERROR(EAGAIN)) return LiveGetResult::AGAIN;
-    if (ret != 0) {
-        ReportError("av_read_frame", ret);
-        return LiveGetResult::FAILURE;
-    }
-
-    if (packet->stream_index == m_InputIndex) {
-        ret = avcodec_send_packet(m_AVCodecContext, packet);
-
-        ret = avcodec_receive_frame(m_AVCodecContext, m_Picture);
-        if (ret == 0) {
-            pts = m_Picture->pts * av_q2d(m_AVFormatContext->streams[m_InputIndex]->time_base);
-            *ptsMilliseconds = static_cast<int64_t>(std::round(pts * 1000));
-
-            sws_scale(m_SwsContext, (const uint8_t* const *) m_Picture->data,
-                    m_Picture->linesize, 0, Height(), m_BGRPicture->data,
-                    m_BGRPicture->linesize);
-
-            memcpy(buffer, m_Buffer, m_NumBytes);
-            gotFrame = 1;
-        }
-    }
-    av_packet_unref(packet);
-
-    av_packet_free(&packet);
-    if (gotFrame) return LiveGetResult::SUCCESS;
-    return LiveGetResult::AGAIN;
-}
-void LibAVLiveInput::Reopen() {
-    Close();
-    Open();
-}
-
-void LibAVLiveInput::ClearError() {
-    m_LastError = "";
-}
-std::string LibAVLiveInput::LastError() {
-    return m_LastError;
-}
-
-std::string LibAVLiveInput::Information() {
-    return m_Information;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-
-V4L2LiveInput::V4L2LiveInput(const std::string& input)
-    : m_Input(input) 
-    , m_FileDescriptor(-1)
-    , m_Streamon(false)
+OpenCVInput::OpenCVInput(const std::string& input)
+    : m_Input(input)
 {
-    Open();
 }
 
-V4L2LiveInput::~V4L2LiveInput() {
-    Close();
+OpenCVInput::~OpenCVInput()
+{
 }
 
-void V4L2LiveInput::Open() {
-    m_FileDescriptor = open(m_Input.c_str(), O_RDWR | O_NONBLOCK);
-    if (m_FileDescriptor < 0) {
-        std::ostringstream os;
-        os << "Failed opening video stream: " << strerror(errno);
-        m_LastError = os.str();
-        return;
-    }
-
-    v4l2_capability cap;
-    if (v4l2_ioctl(m_FileDescriptor, VIDIOC_QUERYCAP, &cap) < 0) {
-        std::ostringstream os;
-        os << "Failed querying video capabilities: " << strerror(errno);
-        m_LastError = os.str();
-        return;
-    }
-
-    std::ostringstream info;
-    info << "V4L2 Stream - (" << cap.driver << ") (" << cap.card << ") "
-         << " version: "
-         << (cap.version >> 16) << "." 
-         << ((cap.version >> 8 & 0xFF)) << "." 
-         << ((cap.version & 0xFF)) << std::endl;
-    if (!(cap.capabilities & V4L2_CAP_VIDEO_CAPTURE)) {
-        m_LastError = "Single-planar video capture not supported";
-        return;
-    }
-
-    v4l2_format format = {};
-    format.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-    if (ioctl(m_FileDescriptor, VIDIOC_G_FMT, &format) < 0) {
-        std::ostringstream os;
-        os << "VIDIOC_G_FMT failed: " << strerror(errno);
-        m_LastError = os.str();
-        return;
-    }
-
-    m_Width = format.fmt.pix.width;
-    m_Height = format.fmt.pix.height;
-    format.fmt.pix.pixelformat = V4L2_PIX_FMT_BGR24;
-    if (ioctl(m_FileDescriptor, VIDIOC_S_FMT, &format) < 0) {
-        std::ostringstream os;
-        os << "VIDIOC_S_FMT failed: " << strerror(errno);
-        m_LastError = os.str();
-        return;
-    }
-
-    info << "[" << m_Width << "x" << m_Height << "] : BGR24" << std::endl;
-
-    int nbufs = 4;
-
-    v4l2_requestbuffers req = {0};
-    req.count = nbufs;
-    req.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-    req.memory = V4L2_MEMORY_MMAP;
-    if (v4l2_ioctl(m_FileDescriptor, VIDIOC_REQBUFS, &req) < 0) {
-        std::ostringstream os;
-        os << "VIDIOC_REQBUFS failed: " << strerror(errno);
-        m_LastError = os.str();
-        return;
-    }
-
-    m_BufferInfos.resize(nbufs);
-    m_Buffers.resize(nbufs);
-    for (int i = 0; i < nbufs; i++) {
-        v4l2_buffer& buf = m_BufferInfos[i];
-        memset(&buf, 0, sizeof(buf));
-        buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-        buf.memory = V4L2_MEMORY_MMAP;
-        buf.index = i;
-        if (v4l2_ioctl(m_FileDescriptor, VIDIOC_QUERYBUF, &buf)) {
-            std::ostringstream os;
-            os << "VIDIOC_REQBUFS failed: " << strerror(errno);
-            m_LastError = os.str();
-            return;
-        }
-
-        m_Buffers[i] = mmap(NULL, 
-            buf.length, PROT_READ | PROT_WRITE, MAP_SHARED, 
-            m_FileDescriptor, buf.m.offset);
-        if (m_Buffers[i] == MAP_FAILED) {
-            std::ostringstream os;
-            os << "map failed: " << strerror(errno);
-            m_LastError = os.str();
-            return;
-        }
-
-        memset(m_Buffers[i], 0, buf.length);
-    }
-
-    for (auto& buf : m_BufferInfos) {
-        if (v4l2_ioctl(m_FileDescriptor, VIDIOC_QBUF, &buf) < 0) {
-            std::ostringstream os;
-            os << "VIDIOC_QBUF failed: " << strerror(errno);
-            m_LastError = os.str();
-            return;
-        }
-    }
-    m_Streamon = false;
-
-    //uint32_t fcc = format.fmt.pix.pixelformat;
-    //std::cout << static_cast<char>((fcc      ) & 0x7f);
-    //std::cout << static_cast<char>((fcc >>  8) & 0x7f);
-    //std::cout << static_cast<char>((fcc >> 16) & 0x7f);
-    //std::cout << static_cast<char>((fcc >> 24) & 0x7f) << std::endl;
-
-
-    m_Information = info.str();
-
+int OpenCVInput::Width() const {
+    return 0;
 }
 
-void V4L2LiveInput::Close() {
-    if (m_Streamon) {
-        int type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-        if (v4l2_ioctl(m_FileDescriptor, VIDIOC_STREAMOFF, &type) < 0) {
-            std::ostringstream os;
-            os << "VIDIOC_STREAMOFF failed: " << strerror(errno);
-            m_LastError = os.str();
-        }
-        m_Streamon = false;
-    }
-
-    if (m_FileDescriptor >= 0) {
-        close(m_FileDescriptor);
-        m_FileDescriptor = -1;
-    }
+int OpenCVInput::Height() const {
+    return 0;
 }
 
-int V4L2LiveInput::Width() const {
-    return m_Width;
-}
 
-int V4L2LiveInput::Height() const {
-    return m_Height;
-}
-
-LiveGetResult V4L2LiveInput::Get(uint8_t* buffer, int64_t* ptsMilliseconds) {
-    if (m_LastError != "") {
-        return LiveGetResult::FAILURE;
-    }
-    if (!m_Streamon) {
-        int type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-        if (v4l2_ioctl(m_FileDescriptor, VIDIOC_STREAMON, &type) < 0) {
-            std::ostringstream os;
-            os << "VIDIOC_STREAMON failed: " << strerror(errno);
-            m_LastError = os.str();
-            return LiveGetResult::FAILURE;
-        }
-        m_Streamon = true;
-    }
-    memset(&m_GetBuffer, 0, sizeof(m_GetBuffer));
-    m_GetBuffer.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-    m_GetBuffer.memory = V4L2_MEMORY_MMAP;
-
-    int ret = v4l2_ioctl(m_FileDescriptor, VIDIOC_DQBUF, &m_GetBuffer);
-    if (ret == 0) {
-        int index = m_GetBuffer.index;
-        if (v4l2_ioctl(m_FileDescriptor, VIDIOC_QBUF, &m_BufferInfos[index]) < 0) {
-            std::ostringstream os;
-            os << "VIDIOC_QBUF failed: " << strerror(errno);
-            m_LastError = os.str();
-            return LiveGetResult::FAILURE;
-        }
-
-        // Got a frame!
-        if (buffer) {
-            std::copy(reinterpret_cast<uint8_t*>(m_Buffers[index]), 
-                    reinterpret_cast<uint8_t*>(m_Buffers[index]) + m_GetBuffer.length, 
-                    buffer);
-        }
-        if (ptsMilliseconds) {
-            *ptsMilliseconds = m_GetBuffer.timestamp.tv_sec * 1000 + m_GetBuffer.timestamp.tv_usec / 1000;
-        }
-        return LiveGetResult::SUCCESS;
-    } else if (errno == EAGAIN) {
-        return LiveGetResult::AGAIN;
-    } else {
-        std::ostringstream os;
-        os << "VIDIOC_DQBUF failed: " << strerror(errno);
-        m_LastError = os.str();
-        return LiveGetResult::FAILURE;
-    }
-
+LiveGetResult OpenCVInput::Get(uint8_t* buffer, int64_t* ptsMilliseconds) {
     return LiveGetResult::FAILURE;
 }
 
-void V4L2LiveInput::Reopen() {
-    Close();
-    Open();
+void OpenCVInput::Reopen() {
 }
 
-void V4L2LiveInput::ClearError() {
-    m_LastError = "";
-}
-std::string V4L2LiveInput::LastError() {
-    return m_LastError;
+void OpenCVInput::ClearError() {
 }
 
-std::string V4L2LiveInput::Information() {
-    return m_Information;
+std::string OpenCVInput::LastError() {
+    return m_Input;
+}
+
+std::string OpenCVInput::Information() {
+    return m_Input;
 }

@@ -50,24 +50,14 @@ make -j8
 sudo make install
 ```
 
-For SDL
-```
-curl https://www.libsdl.org/release/SDL2-2.0.12.tar.gz --output SDL2-2.0.12.tar.gz
-tar -xvf SDL2-2.0.12.tar.gz
-cd SDL2-2.0.12.tar.gz
-./configure
-make all
-sudo make install
-```
-
 #### Build
 ```
 mkdir build && cd build
-cmake ..
+cmake -G "Ninja" ..
 ```
 
 ```
-make
+ninja -j6
 ```
 
 Windows
@@ -75,19 +65,9 @@ Windows
 #### One time setup
 - Install Visual Studio 2019 community edition, other versions might work
 - Install cmake for windows: cmake.org/download, add to path for ease
-- Download and install [zlib](http://gnuwin32.sourceforge.net/packages/zlib.htm)
-    - Complete package, except sources (Setup)
-    - Keep track of the install directory, by default it's something like: "C:/Program Files (x86)/GnuWin32/"
-    - This is a dependency of nestopia
-- Download and install [sdl2](https://www.libsdl.org/download-2.0.php)
-    - SDL2-devel-2.0.16-VC.zip, then unzip it
-    - Keep track of the final directory, I put mine in "C:/sdl2"
 - Download and install [opencv](https://opencv.org/releases/)
     - Click: Windows, Download it, Run the executable
     - I extracted to "C:\opencv"
-- Download and install [glew](http://glew.sourceforge.net/index.html)
-    - Windows 32-bit and 64-bit, then unzip it
-    - Keep track of the final directory, I put mine in "C:/glew"
 
 #### Build
 ```
@@ -103,4 +83,8 @@ msbuild ALL_BUILD.vcxprox
 ```
 
 
+gcc-mingw-w64-x86-64 g++-mingw-w64-x86-64 wine64 gcc-multilib
+x86_64-w64-mingw32-gcc
+x86_64-w64-mingw32-g++
 
+cmake -D CMAKE_C_COMPILER=x86_64-w64-mingw32-gcc -D CMAKE_CXX_COMPILER=x86_64-w64-mingw32-g++ ..

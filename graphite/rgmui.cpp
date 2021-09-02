@@ -20,8 +20,8 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-#include "GL/glew.h"
 #include "graphite/rgmui.h"
+#include "GL/gl.h"
 
 #include "backends/imgui_impl_sdl.h"
 #include "backends/imgui_impl_opengl3.h"
@@ -94,10 +94,6 @@ Window::Window(int winsizex, int winsizey, const std::string& name)
     //   1 for synchronized
     int swpInterval = 0;
     SDL_GL_SetSwapInterval(swpInterval);
-
-    if (glewInit() != GLEW_OK) {
-        throw std::runtime_error("Glew init error");
-    }
 
     ImGui::CreateContext();
     ImGui::StyleColorsDark();
