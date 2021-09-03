@@ -22,6 +22,8 @@
 cmake_minimum_required(VERSION 3.6)
 project(graphite)
 
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-anon-enum-enum-conversion")
+
 ################################################################################
 # NES Lib
 #   - For emulating the nintendo entertainment system
@@ -54,14 +56,21 @@ add_library(utillib
 add_library(videolib
     video.cpp
 )
+target_include_directories(videolib PUBLIC
+    ${OpenCV_INCLUDE_DIRS}
+)
 target_link_libraries(videolib
     utillib
     fmt::fmt
+    ${OpenCV_LIBRARIES}
 )
 if (UNIX)
     add_library(videolibextra
         libavimpl.cpp
         v4l2impl.cpp
+    )
+    target_include_directories(videolibextra PUBLIC
+        ${OpenCV_INCLUDE_DIRS}
     )
     target_link_libraries(videolibextra
         v4l1 v4l2 avformat avcodec avutil swscale pthread fmt::fmt
@@ -106,7 +115,7 @@ add_library(graphitelib
     graphite.cpp
 )
 target_link_libraries(graphitelib
-    neslib rgmuilib videolib 
+    neslib rgmuilib videolib stdc++fs
 )
 if (UNIX)
     target_link_libraries(rgmuilib

@@ -53,6 +53,8 @@ enum EventType : int {
     NES_STATE_SET_TO, // std::string
 
     INPUT_SET_TO, // InputChangeEvent
+    OFFSET_SET_TO, // int
+    SET_OFFSET_TO, // int
 };
 
 struct EmuViewConfig;
@@ -60,7 +62,7 @@ class NESEmulatorComponent : public rgmui::IApplicationComponent {
 public:
     NESEmulatorComponent(rgmui::EventQueue* queue, 
             const std::string& inesPath,
-            const EmuViewConfig& emuViewConfig);
+            EmuViewConfig* emuViewConfig);
     ~NESEmulatorComponent();
 
     virtual void OnFrame() override;
@@ -125,12 +127,13 @@ private:
     std::vector<Change> m_Changes;
 };
 
+inline const std::string FM2_OFFSET_COMMENT_LINE_START = "comment offset ";
 class InputsComponent : public rgmui::IApplicationComponent {
 public:
     InputsComponent(
             rgmui::EventQueue* queue,
             const std::string& fm2Path,
-            InputsConfig config = InputsConfig::Defaults()
+            InputsConfig* config
             );
     ~InputsComponent();
 
@@ -151,11 +154,13 @@ private:
     std::string ButtonText(uint8_t button);
 
 private:
+    std::string OffsetLine() const;
     void TryReadFM2();
     void WriteFM2();
 
     nes::FM2Header m_Header;
     std::string m_FM2Path;
+    int m_OffsetMillis; 
 
 
 private:
@@ -182,7 +187,7 @@ private:
         void Clear();
     } m_Drag;
 
-    InputsConfig m_Config;
+    InputsConfig* m_Config;
     UndoRedo m_UndoRedo;
 
     std::vector<nes::ControllerState> m_Inputs;
@@ -208,7 +213,7 @@ struct ScreenPeekConfig {
 
 class ScreenPeekSubComponent : public IEmuPeekSubComponent {
 public:
-    ScreenPeekSubComponent(rgmui::EventQueue* queue, ScreenPeekConfig config);
+    ScreenPeekSubComponent(rgmui::EventQueue* queue, ScreenPeekConfig* config);
     virtual ~ScreenPeekSubComponent();
 
     virtual void CacheNewEmulatorData(nes::INESEmulator* emu) override;
@@ -228,7 +233,7 @@ private:
 
 private:
     rgmui::EventQueue* m_EventQueue;
-    ScreenPeekConfig m_Config;
+    ScreenPeekConfig* m_Config;
 
     nes::Frame m_Frame;
     cv::Mat m_Image;
@@ -238,6 +243,7 @@ private:
 
 struct EmuViewConfig {
     ScreenPeekConfig ScreenPeekCfg;
+    nes::StateSequenceThreadConfig StateSequenceThreadCfg;
 
     static EmuViewConfig Defaults();
 };
@@ -246,7 +252,7 @@ class EmuViewComponent : public rgmui::IApplicationComponent {
 public:
     EmuViewComponent(rgmui::EventQueue* queue,
             std::unique_ptr<nes::INESEmulator>&& emu,
-            const EmuViewConfig& config);
+            EmuViewConfig* config);
     ~EmuViewComponent();
 
     virtual void OnFrame() override;
@@ -273,7 +279,7 @@ class VideoComponent : public rgmui::IApplicationComponent {
 public:
     VideoComponent(rgmui::EventQueue* queue,
             const std::string& videoPath,
-            VideoConfig videoCfg);
+            VideoConfig* videoCfg);
     ~VideoComponent();
 
     virtual void OnFrame() override;
@@ -285,17 +291,18 @@ private:
     void SetBlankImage();
     void FindTargetFrame(int frameIndex);
     void UpdatePTSs();
+    void SetOffset(int offset);
+    void UpdateOffset(int dx);
 
     void SetVideoFrame(int videoIndex);
 
 
 private:
     rgmui::EventQueue* m_EventQueue;
-    VideoConfig m_Config;
+    VideoConfig* m_Config;
     std::string m_VideoPath;
     std::unique_ptr<video::LiveInputThread> m_VideoThread;
 
-    int64_t m_PtsOffset;
     int64_t m_CurrentVideoIndex;
     int m_InputTarget;
 
@@ -318,20 +325,38 @@ struct GraphiteConfig {
 
     static GraphiteConfig Defaults();
 };
-void ParseArgumentsToConfig(int* argc, char*** argv, GraphiteConfig* config);
+bool ParseArgumentsToConfig(int* argc, char*** argv, GraphiteConfig* config);
+void SetFM2PathFromVideoPath(GraphiteConfig* config);
 
 class GraphiteApp : public rgmui::IApplication {
 public:
-    GraphiteApp(GraphiteConfig config);
+    GraphiteApp(GraphiteConfig* config);
     ~GraphiteApp();
 
     virtual bool OnFrame() override;
 
 private:
-    GraphiteConfig m_Config;
+    GraphiteConfig* m_Config;
     rgmui::EventQueue m_EventQueue;
 };
 
+
+class GraphiteConfigApp : public rgmui::IApplication {
+public:
+    GraphiteConfigApp(bool* wasExited, GraphiteConfig* config);
+    ~GraphiteConfigApp();
+
+    virtual bool OnSDLEvent(const SDL_Event& e) override;
+    virtual bool OnFrame() override;
+
+private:
+    static rgmui::IApplicationConfig ThisApplicationConfig();
+    bool* m_WasExited;
+    GraphiteConfig* m_Config;
+
+    std::vector<std::string> m_PossibleInesPaths;
+    std::vector<std::string> m_PossibleVideoPaths;
+};
 
 
 

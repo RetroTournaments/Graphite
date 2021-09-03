@@ -35,18 +35,18 @@ int main(int argc, char** argv) {
     util::ArgNext(&argc, &argv); // Skip path argument
 
     GraphiteConfig config = GraphiteConfig::Defaults();
+    rgmui::Window window(1920, 1080, "Graphite");
+    if (!ParseArgumentsToConfig(&argc, &argv, &config)) {
+        bool wasExited = false;
+        GraphiteConfigApp cfgApp(&wasExited, &config);
+        rgmui::WindowAppMainLoop(&window, &cfgApp, std::chrono::microseconds(10000));
 
-    try {
-        ParseArgumentsToConfig(&argc, &argv, &config);
-    } catch (std::runtime_error e) {
-        std::cerr << "Error parsing arguments" << std::endl;
-        std::cerr << "  \"" << e.what() << "\"" << std::endl;
-        return 1;
+        if (wasExited) {
+            return 0;
+        }
     }
 
-    GraphiteApp app(config);
-    rgmui::Window window(1920, 1080, "Graphite");
-
+    GraphiteApp app(&config);
     rgmui::WindowAppMainLoop(&window, &app, std::chrono::microseconds(10000));
     return 0;
 }

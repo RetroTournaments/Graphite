@@ -313,6 +313,7 @@ void LiveInputThread::SetQueueCapacity(int64_t capacity) {
 OpenCVInput::OpenCVInput(const std::string& input)
     : m_Input(input)
 {
+    Reopen();
 }
 
 OpenCVInput::~OpenCVInput()
@@ -320,26 +321,61 @@ OpenCVInput::~OpenCVInput()
 }
 
 int OpenCVInput::Width() const {
-    return 0;
+    return m_Width;
 }
 
 int OpenCVInput::Height() const {
-    return 0;
+    return m_Height;
 }
 
 
 LiveGetResult OpenCVInput::Get(uint8_t* buffer, int64_t* ptsMilliseconds) {
-    return LiveGetResult::FAILURE;
+    if (!m_Error.empty()) {
+        return LiveGetResult::FAILURE;
+    }
+
+    if (!m_OnFirstFrame) {
+        if (!ReadNextFrame()) {
+            return LiveGetResult::FAILURE;
+        }
+    }
+
+    m_OnFirstFrame = false;
+    std::memcpy(buffer, m_Frame.data, m_NumBytes);
+    *ptsMilliseconds = std::round(m_PTS);
+    return LiveGetResult::SUCCESS;
+}
+
+bool OpenCVInput::ReadNextFrame() {
+    m_Capture->read(m_Frame);
+    m_PTS = m_Capture->get(cv::CAP_PROP_POS_MSEC);
+    if (m_Frame.empty()) {
+        m_Error = "ERROR empty frame";
+        return false;
+    }
+    return true;
 }
 
 void OpenCVInput::Reopen() {
+    ClearError();
+    m_Capture = std::make_unique<cv::VideoCapture>(m_Input);
+    if (!m_Capture->isOpened()) {
+        m_Error = "ERROR unable to open camera";
+    }
+
+    m_OnFirstFrame = true;
+    ReadNextFrame();
+    m_Width = m_Frame.cols;
+    m_Height = m_Frame.rows;
+    m_NumBytes = m_Width * m_Height * 3;
 }
 
 void OpenCVInput::ClearError() {
+    m_Error = "";
 }
 
 std::string OpenCVInput::LastError() {
-    return m_Input;
+    return m_Error;
 }
 
 std::string OpenCVInput::Information() {

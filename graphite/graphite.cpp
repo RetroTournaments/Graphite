@@ -23,13 +23,14 @@
 #include <iomanip>
 #include <fstream>
 #include <iostream>
+#define _SILENCE_EXPERIMENTAL_FILESYSTEM_DEPRECATION_WARNING
+#include <experimental/filesystem>
+namespace fs = std::experimental::filesystem;
 
 #include "fmt/core.h"
 
 #include "graphite/graphite.h"
 #include "graphite/nestopiaimpl.h"
-
-//#include "graphite/libavimpl.h"
 
 using namespace graphite;
 
@@ -41,27 +42,30 @@ GraphiteConfig GraphiteConfig::Defaults() {
     return config;
 }
 
-void graphite::ParseArgumentsToConfig(int* argc, char*** argv, GraphiteConfig* config) {
-    // TODO more general argument handling, things like input fm2s / motifs? /
-    // cropping parameters for the video / general config settings etc.
-    if (*argc != 3) {
-        throw std::runtime_error("Supply exactly three arguments: blah.nes blah.mkv blah.fm2");
-    }
-
-    util::ArgReadString(argc, argv, &config->InesPath);
-    util::ArgReadString(argc, argv, &config->VideoPath);
-    util::ArgReadString(argc, argv, &config->FM2Path);
+void graphite::SetFM2PathFromVideoPath(GraphiteConfig* config) {
+    fs::path path(config->VideoPath);
+    config->FM2Path = fmt::format("{}.fm2", path.stem().string());
 }
 
-GraphiteApp::GraphiteApp(GraphiteConfig config) 
+bool graphite::ParseArgumentsToConfig(int* argc, char*** argv, GraphiteConfig* config) {
+    if (*argc == 2) {
+        util::ArgReadString(argc, argv, &config->InesPath);
+        util::ArgReadString(argc, argv, &config->VideoPath);
+        SetFM2PathFromVideoPath(config);
+        return true;
+    }
+    return false;
+}
+
+GraphiteApp::GraphiteApp(GraphiteConfig* config) 
     : m_Config(config)
 {
     RegisterComponent(std::make_shared<NESEmulatorComponent>(
-                &m_EventQueue, m_Config.InesPath, m_Config.EmuViewCfg));
+                &m_EventQueue, m_Config->InesPath, &m_Config->EmuViewCfg));
     RegisterComponent(std::make_shared<InputsComponent>(
-                &m_EventQueue, m_Config.FM2Path, m_Config.InputsCfg));
+                &m_EventQueue, m_Config->FM2Path, &m_Config->InputsCfg));
     RegisterComponent(std::make_shared<VideoComponent>(
-                &m_EventQueue, m_Config.VideoPath, m_Config.VideoCfg));
+                &m_EventQueue, m_Config->VideoPath, &m_Config->VideoCfg));
 }
 
 GraphiteApp::~GraphiteApp() {
@@ -74,11 +78,11 @@ bool GraphiteApp::OnFrame() {
 
 NESEmulatorComponent::NESEmulatorComponent(rgmui::EventQueue* queue, 
         const std::string& inesPath,
-        const EmuViewConfig& emuViewConfig) 
+        EmuViewConfig* emuViewConfig) 
     : m_EventQueue(queue)
     , m_EmulatorFactory(InitializeEmulatorFactory(inesPath))
     , m_StateSequenceThread(
-            nes::StateSequenceThreadConfig::Defaults(),
+            emuViewConfig->StateSequenceThreadCfg,
             std::move(m_EmulatorFactory->GetEmu()))
 {
     m_EventQueue->SubscribeI(EventType::INPUT_TARGET_SET_TO, [&](int v){
@@ -161,7 +165,7 @@ InputsConfig InputsConfig::Defaults() {
 
 InputsComponent::InputsComponent(rgmui::EventQueue* queue,
         const std::string& fm2Path,
-        InputsConfig config)
+        InputsConfig* config)
     : m_EventQueue(queue)
     , m_FM2Path(fm2Path)
     , m_Config(config)
@@ -192,12 +196,22 @@ InputsComponent::InputsComponent(rgmui::EventQueue* queue,
     queue->SubscribeI(EventType::NES_FRAME_SET_TO, [&](int v){
         m_CurrentIndex = v;
     });
+    queue->SubscribeI(EventType::OFFSET_SET_TO, [&](int v){
+        m_OffsetMillis = v;
+    });
 
     TryReadFM2();
 }
 
 InputsComponent::~InputsComponent() {
     WriteFM2();
+}
+
+static bool StringStartsWith(const std::string& str, const std::string& start) {
+    if (str.length() >= start.length()) {
+        return str.compare(0, start.length(), start) == 0;
+    }
+    return false;
 }
 
 void InputsComponent::TryReadFM2() {
@@ -212,19 +226,41 @@ void InputsComponent::TryReadFM2() {
             }
             frameIndex++;
         }
+        for (auto & line : m_Header.additionalLines) {
+            if (StringStartsWith(line, FM2_OFFSET_COMMENT_LINE_START)) {
+                int v = std::stoi(line.substr(FM2_OFFSET_COMMENT_LINE_START.size()));
+                m_EventQueue->PublishI(EventType::SET_OFFSET_TO, v);
+                break;
+            }
+        }
+
     } else {
         m_Header = nes::FM2Header::Defaults();
     }
 }
 
+std::string InputsComponent::OffsetLine() const {
+    return fmt::format("{}{}", FM2_OFFSET_COMMENT_LINE_START, m_OffsetMillis);
+}
+
 void InputsComponent::WriteFM2() {
     std::ofstream ofs(m_FM2Path);
+    bool offsetFound = false;
+    for (auto & line : m_Header.additionalLines) {
+        if (StringStartsWith(line, FM2_OFFSET_COMMENT_LINE_START)) {
+            line = OffsetLine();
+            offsetFound = true;
+        }
+    }
+    if (!offsetFound) {
+        m_Header.additionalLines.push_back(OffsetLine());
+    }
     nes::WriteFM2File(ofs, m_Inputs, m_Header);
 }
 
 std::string InputsComponent::FrameText(int frameId) const {
     std::ostringstream os;
-    os << std::setw(m_Config.FrameTextNumDigits) << std::setfill('0') << frameId + 1;
+    os << std::setw(m_Config->FrameTextNumDigits) << std::setfill('0') << frameId + 1;
     return os.str();
 }
 
@@ -232,16 +268,16 @@ ImVec2 InputsComponent::CalcLineSize() {
     int height = ImGui::GetFrameHeight() + 3;
 
     int width = 0;
-    width += m_Config.ColumnPadding;
+    width += m_Config->ColumnPadding;
     m_ColumnX.push_back(width); // CHEVRON
-    width += m_Config.ChevronColumnWidth;
-    width += m_Config.ColumnPadding;
+    width += m_Config->ChevronColumnWidth;
+    width += m_Config->ColumnPadding;
     m_ColumnX.push_back(width); // FRAME_TEXT
-    width += m_Config.FrameTextColumnWidth;
-    width += m_Config.ColumnPadding;
+    width += m_Config->FrameTextColumnWidth;
+    width += m_Config->ColumnPadding;
     m_ColumnX.push_back(width); // BUTTONS
-    width += m_Config.ButtonWidth * 8;
-    width += m_Config.ColumnPadding;
+    width += m_Config->ButtonWidth * 8;
+    width += m_Config->ColumnPadding;
 
     return ImVec2(width, height);
 }
@@ -291,7 +327,7 @@ void InputsComponent::DrawButton(ImDrawList* list, ImVec2 ul, ImVec2 lr, uint8_t
     }
 
     if (buttonOn) {
-        list->AddRectFilled(ul2, lr2, m_Config.ButtonColor, rounding);
+        list->AddRectFilled(ul2, lr2, m_Config->ButtonColor, rounding);
     }
     std::string buttonText = ButtonText(button);
     ImVec2 txtsiz = ImGui::CalcTextSize(buttonText.c_str());
@@ -300,7 +336,7 @@ void InputsComponent::DrawButton(ImDrawList* list, ImVec2 ul, ImVec2 lr, uint8_t
 }
 
 ImU32 InputsComponent::TextColor(bool highlighted) {
-    return highlighted ? m_Config.HighlightTextColor : m_Config.TextColor;
+    return highlighted ? m_Config->HighlightTextColor : m_Config->TextColor;
 }
 
 void InputsComponent::DoInputLine(int frameIndex) {
@@ -382,7 +418,7 @@ void InputsComponent::DoInputLine(int frameIndex) {
         ImVec2 b(glr.x - 3, p.y + m_LineSize.y / 2);
         ImVec2 c(p.x, p.y + m_LineSize.y);
         if (m_TargetIndex == frameIndex) {
-            list->AddTriangleFilled(a, b, c, m_Config.ButtonColor);
+            list->AddTriangleFilled(a, b, c, m_Config->ButtonColor);
         }
         if (m_CurrentIndex == frameIndex) {
             list->AddTriangle(a, b, c, IM_COL32_WHITE, 1.0f);
@@ -419,9 +455,9 @@ void InputsComponent::DoInputLine(int frameIndex) {
         bool highlighted = inHighlightList && (button & m_Drag.HLButtons);
 
 
-        int tx = p.x + bx + buttonCount * m_Config.ButtonWidth;
+        int tx = p.x + bx + buttonCount * m_Config->ButtonWidth;
         ImVec2 ul(tx, p.y);
-        ImVec2 lr(tx + m_Config.ButtonWidth, p.y + m_LineSize.y);
+        ImVec2 lr(tx + m_Config->ButtonWidth, p.y + m_LineSize.y);
 
         if (m_AllowDragging && !rgmui::IsAnyPopupOpen() && ImGui::IsMouseHoveringRect(ul, lr)) {
             if (!inHighlightList) {
@@ -535,6 +571,9 @@ void InputsComponent::OnSDLEvent(const SDL_Event& e) {
     if (rgmui::KeyDownWithCtrl(e, SDLK_y)) {
         m_UndoRedo.Redo();
     }
+    if (rgmui::KeyDownWithCtrl(e, SDLK_s)) {
+        WriteFM2();
+    }
 }
 
 void InputsComponent::OnFrame() {
@@ -554,11 +593,11 @@ void InputsComponent::OnFrame() {
         }
 
         if (ImGui::GetScrollY() == ImGui::GetScrollMaxY()) {
-            if (m_Inputs.size() < m_Config.MaxInputSize) {
+            if (m_Inputs.size() < m_Config->MaxInputSize) {
                 m_Inputs.insert(m_Inputs.end(), 100, 0x00);
             }
-            if (m_Inputs.size() > m_Config.MaxInputSize) {
-                m_Inputs.resize(m_Config.MaxInputSize);
+            if (m_Inputs.size() > m_Config->MaxInputSize) {
+                m_Inputs.resize(m_Config->MaxInputSize);
             }
         }
 
@@ -686,16 +725,17 @@ IEmuPeekSubComponent::~IEmuPeekSubComponent() {
 EmuViewConfig EmuViewConfig::Defaults() {
     EmuViewConfig cfg;
     cfg.ScreenPeekCfg = ScreenPeekConfig::Defaults();
+    cfg.StateSequenceThreadCfg = nes::StateSequenceThreadConfig::Defaults();
     return cfg;
 }
 
 EmuViewComponent::EmuViewComponent(rgmui::EventQueue* queue,
             std::unique_ptr<nes::INESEmulator>&& emu,
-            const EmuViewConfig& config)
+            EmuViewConfig* config)
     : m_EventQueue(queue)
     , m_Emulator(std::move(emu))
 {
-    RegisterEmuPeekComponent(std::make_shared<ScreenPeekSubComponent>(queue, config.ScreenPeekCfg));
+    RegisterEmuPeekComponent(std::make_shared<ScreenPeekSubComponent>(queue, &config->ScreenPeekCfg));
 
     m_EventQueue->SubscribeS(NES_STATE_SET_TO, [&](const std::string& state){
         if (state.empty()) {
@@ -734,7 +774,7 @@ ScreenPeekConfig ScreenPeekConfig::Defaults() {
 }
 
 ScreenPeekSubComponent::ScreenPeekSubComponent(rgmui::EventQueue* queue,
-        ScreenPeekConfig config)
+        ScreenPeekConfig* config)
     : m_EventQueue(queue)
     , m_Config(config)
 {
@@ -756,16 +796,16 @@ void ScreenPeekSubComponent::CacheNewEmulatorData(nes::INESEmulator* emu) {
 void ScreenPeekSubComponent::ConstructImageFromFrame() {
     m_Image = rgmui::ConstructPaletteImage(
             m_Frame.data(), nes::FRAME_WIDTH, nes::FRAME_HEIGHT,
-            m_Config.NESPalette.data());
-    cv::resize(m_Image, m_Image, {}, m_Config.ScreenMultiplier, m_Config.ScreenMultiplier,
+            m_Config->NESPalette.data());
+    cv::resize(m_Image, m_Image, {}, m_Config->ScreenMultiplier, m_Config->ScreenMultiplier,
             cv::INTER_NEAREST);
 }
 
 void ScreenPeekSubComponent::SetBlankImage() {
     m_Frame.fill(0);
     m_Image = cv::Mat::zeros(
-            nes::FRAME_HEIGHT * m_Config.ScreenMultiplier,
-            nes::FRAME_WIDTH * m_Config.ScreenMultiplier, CV_8UC3);
+            nes::FRAME_HEIGHT * m_Config->ScreenMultiplier,
+            nes::FRAME_WIDTH * m_Config->ScreenMultiplier, CV_8UC3);
 }
 
 void ScreenPeekSubComponent::OnFrame() {
@@ -814,9 +854,9 @@ std::string ScreenPeekSubComponent::PixelText(uint8_t pixel) const {
 ImVec4 ScreenPeekSubComponent::PeekPixelColor(uint8_t pixel) const {
     ImVec4 c(0, 0, 0, 1.0);
     if (pixel < nes::PALETTE_ENTRIES) {
-        c.x = static_cast<float>(m_Config.NESPalette[pixel * 3 + 0]) / 255.0f;
-        c.y = static_cast<float>(m_Config.NESPalette[pixel * 3 + 1]) / 255.0f;
-        c.z = static_cast<float>(m_Config.NESPalette[pixel * 3 + 2]) / 255.0f;
+        c.x = static_cast<float>(m_Config->NESPalette[pixel * 3 + 0]) / 255.0f;
+        c.y = static_cast<float>(m_Config->NESPalette[pixel * 3 + 1]) / 255.0f;
+        c.z = static_cast<float>(m_Config->NESPalette[pixel * 3 + 2]) / 255.0f;
     }
     return c;
 }
@@ -824,8 +864,8 @@ ImVec4 ScreenPeekSubComponent::PeekPixelColor(uint8_t pixel) const {
 bool ScreenPeekSubComponent::GetScreenPeekPixel(const ImVec2& cursorPos, const ImVec2& mousePos,
         int* x, int* y, uint8_t* pixel) const {
 
-    int ix = std::round((mousePos.x - cursorPos.x) / m_Config.ScreenMultiplier);
-    int iy = std::round((mousePos.y - cursorPos.y) / m_Config.ScreenMultiplier);
+    int ix = std::round((mousePos.x - cursorPos.x) / m_Config->ScreenMultiplier);
+    int iy = std::round((mousePos.y - cursorPos.y) / m_Config->ScreenMultiplier);
 
     if (ix >= 0 && ix < nes::FRAME_WIDTH &&
         iy >= 0 && iy < nes::FRAME_HEIGHT) {
@@ -858,7 +898,7 @@ void ScreenPeekSubComponent::DoPopupItems(int x, int y, uint8_t pixel) {
     }
 
     ImGui::PushItemWidth(100);
-    if (ImGui::SliderInt("mult", &m_Config.ScreenMultiplier, 1, 5)) {
+    if (ImGui::SliderInt("mult", &m_Config->ScreenMultiplier, 1, 5)) {
         ConstructImageFromFrame();
     }
     ImGui::PopItemWidth();
@@ -886,7 +926,7 @@ VideoConfig VideoConfig::Defaults() {
 
 VideoComponent::VideoComponent(rgmui::EventQueue* queue,
         const std::string& videoPath,
-        VideoConfig videoCfg)
+        VideoConfig* videoCfg)
     : m_EventQueue(queue)
     , m_Config(videoCfg)
     , m_CurrentVideoIndex(-1)
@@ -897,10 +937,13 @@ VideoComponent::VideoComponent(rgmui::EventQueue* queue,
         m_InputTarget = v;
         FindTargetFrame(v);
     });
+    m_EventQueue->SubscribeI(EventType::SET_OFFSET_TO, [&](int v){
+        SetOffset(v);
+    });
 
-    //m_VideoThread = std::make_unique<video::LiveInputThread>(
-    //            std::make_unique<video::LibAVLiveInput>(videoPath),
-    //            m_Config.MaxFrames, false);
+    m_VideoThread = std::make_unique<video::LiveInputThread>(
+                std::make_unique<video::OpenCVInput>(videoPath),
+                m_Config->MaxFrames, false);
     SetBlankImage();
 }
 
@@ -933,7 +976,7 @@ int64_t VideoComponent::FrameIndexToPTS(int frameIndex) {
     double denom = static_cast<double>(nes::NTSC_FPS_DENOMINATOR);
     double numer = static_cast<double>(nes::NTSC_FPS_NUMERATOR);
 
-    int64_t targetPts = static_cast<int64_t>(std::round((fi * denom * 1000) / numer)) + m_Config.OffsetMillis;
+    int64_t targetPts = static_cast<int64_t>(std::round((fi * denom * 1000) / numer)) + m_Config->OffsetMillis;
     return targetPts;
 }
 
@@ -941,7 +984,7 @@ int VideoComponent::PTSToFrameIndex(int64_t pts) {
     double denom = static_cast<double>(nes::NTSC_FPS_DENOMINATOR);
     double numer = static_cast<double>(nes::NTSC_FPS_NUMERATOR);
 
-    double fi = ((pts - m_Config.OffsetMillis) * numer) / (denom * 1000);
+    double fi = ((pts - m_Config->OffsetMillis) * numer) / (denom * 1000);
     return static_cast<int>(std::round(fi));
 }
 
@@ -979,22 +1022,42 @@ void VideoComponent::SetVideoFrame(int videoIndex) {
             m_LiveInputFrame->Width,
             CV_8UC3,
             m_LiveInputFrame->Buffer);
-    cv::resize(m_Image, m_Image, {}, m_Config.ScreenMultiplier, m_Config.ScreenMultiplier,
+    cv::resize(m_Image, m_Image, {}, m_Config->ScreenMultiplier, m_Config->ScreenMultiplier,
             cv::INTER_NEAREST);
 }
 
 void VideoComponent::SetBlankImage() {
     m_Image = cv::Mat::zeros(
-            nes::FRAME_HEIGHT * m_Config.ScreenMultiplier,
-            nes::FRAME_WIDTH * m_Config.ScreenMultiplier, CV_8UC3);
+            nes::FRAME_HEIGHT * m_Config->ScreenMultiplier,
+            nes::FRAME_WIDTH * m_Config->ScreenMultiplier, CV_8UC3);
+}
+
+void VideoComponent::SetOffset(int offset) {
+    m_Config->OffsetMillis = offset;
+    m_EventQueue->PublishI(EventType::OFFSET_SET_TO, offset);
+}
+
+void VideoComponent::UpdateOffset(int dx) {
+    int startFrame = m_CurrentVideoIndex;
+    int endFrame = m_CurrentVideoIndex + dx;
+    int n = static_cast<int>(m_PTS.size());
+    if (startFrame >= 0 && startFrame < n &&
+        endFrame >= 0 && endFrame < n) {
+
+        int64_t oPts = m_PTS[startFrame];
+        int64_t ePts = m_PTS[endFrame];
+
+        int o = m_Config->OffsetMillis + (ePts - oPts);
+        SetOffset(o);
+        FindTargetFrame(m_InputTarget);
+    }
 }
 
 void VideoComponent::OnFrame() {
     if (m_CurrentVideoIndex == -1) {
         FindTargetFrame(0);
     }
-    if (ImGui::Begin("video")) {
-
+    if (ImGui::Begin("Video")) {
         rgmui::Mat("screen", m_Image);
         if (ImGui::IsItemHovered()) {
             auto& io = ImGui::GetIO();
@@ -1018,31 +1081,129 @@ void VideoComponent::OnFrame() {
             }
         }
 
-        //std::string t = "No video";
-        //if (m_VideoThread) {
-        //    if (m_VideoThread->HasError()) {
-        //        t = m_VideoThread->GetError();
-        //        if (t == "[ERROR] in av_read_frame\n  End of file\n") {
-        //            t = m_VideoThread->InputInformation();
-        //        }
-        //    } else {
-        //        t = m_VideoThread->InputInformation();
-        //    }
-        //}
-        //ImGui::TextUnformatted(t.c_str());
         ImGui::Text("%s : %ld [%ld]", m_VideoPath.c_str(), m_CurrentVideoIndex, m_PTS[m_CurrentVideoIndex]);
         ImGui::PushItemWidth(200);
-        if (ImGui::InputInt("offset", &m_Config.OffsetMillis)) {
+        if (ImGui::InputInt("offset pts", &m_Config->OffsetMillis)) {
+            SetOffset(m_Config->OffsetMillis);
             FindTargetFrame(m_InputTarget);
         }
         ImGui::PopItemWidth();
         ImGui::SameLine();
-        if (ImGui::Button("current frame")) {
-            m_Config.OffsetMillis = m_PTS[m_CurrentVideoIndex];
+        if (ImGui::Button("<")) {
+            UpdateOffset(-1);
+        }
+        ImGui::SameLine();
+        if (ImGui::Button(">")) {
+            UpdateOffset(1);
+        }
+        ImGui::SameLine();
+        if (ImGui::Button("set reset")) {
+            SetOffset(m_PTS[m_CurrentVideoIndex]);
             m_EventQueue->PublishI(EventType::SET_INPUT_TARGET_TO, 0);
         }
     }
     ImGui::End();
 }
 
+////////////////////////////////////////////////////////////////////////////////
 
+GraphiteConfigApp::GraphiteConfigApp(bool* wasExited, GraphiteConfig* config)
+    : rgmui::IApplication(ThisApplicationConfig())
+    , m_WasExited(wasExited)
+    , m_Config(config)
+{
+    for (const auto & entry : fs::directory_iterator(".")) {
+        if (entry.path().extension().string() == ".nes") {
+            m_PossibleInesPaths.push_back(entry.path().string());
+        }
+    }
+    if (m_PossibleInesPaths.size() == 1) {
+        m_Config->InesPath = m_PossibleInesPaths.front();
+    }
+
+
+    for (const auto & entry : fs::directory_iterator(".")) {
+        if (entry.path().extension().string() == ".mp4") {
+            m_PossibleVideoPaths.push_back(entry.path().string());
+        }
+    }
+    if (m_PossibleVideoPaths.size() == 1) {
+        m_Config->VideoPath = m_PossibleVideoPaths.front();
+        SetFM2PathFromVideoPath(m_Config);
+    }
+
+}
+
+GraphiteConfigApp::~GraphiteConfigApp() {
+}
+
+rgmui::IApplicationConfig GraphiteConfigApp::ThisApplicationConfig() {
+    rgmui::IApplicationConfig cfg = rgmui::IApplicationConfig::Defaults();
+    cfg.CtrlWIsExit = false;
+    cfg.DefaultDockspace = false;
+    return cfg;
+}
+
+bool GraphiteConfigApp::OnSDLEvent(const SDL_Event& e) {
+    if (rgmui::KeyDownWithCtrl(e, SDLK_w)) {
+        *m_WasExited = true;
+        return false;
+    }
+
+    return true;
+}
+
+bool GraphiteConfigApp::OnFrame() {
+    bool ret = true;
+    auto& io = ImGui::GetIO();
+
+    if (m_Config->InesPath.empty()) {
+        ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f), ImGuiCond_Once,
+                ImVec2(0.5f, 0.5f));
+        ImGui::SetNextWindowSize(ImVec2(0, 0), ImGuiCond_Once);
+
+        if (ImGui::Begin("Select Ines File")) {
+            if (m_PossibleInesPaths.empty()) {
+                ImGui::TextUnformatted("Please place the .nes file in the");
+                ImGui::TextUnformatted("same directory as graphite.exe");
+                if (ImGui::Button("ok")) {
+                    *m_WasExited = true;
+                    ret = false;
+                }
+            } else {
+                for (auto & path : m_PossibleInesPaths) {
+                    if (ImGui::Button(path.c_str())) {
+                        m_Config->InesPath = path;
+                    }
+                }
+            }
+        }
+        ImGui::End();
+    } else if (m_Config->VideoPath.empty()) {
+        ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f), ImGuiCond_Once,
+                ImVec2(0.5f, 0.5f));
+        ImGui::SetNextWindowSize(ImVec2(0, 0), ImGuiCond_Once);
+
+        if (ImGui::Begin("Select Video File")) {
+            if (m_PossibleVideoPaths.empty()) {
+                ImGui::TextUnformatted("Please place the .mp4 file in the");
+                ImGui::TextUnformatted("same directory as graphite.exe");
+                if (ImGui::Button("ok")) {
+                    *m_WasExited = true;
+                    ret = false;
+                }
+            } else {
+                for (auto & path : m_PossibleVideoPaths) {
+                    if (ImGui::Button(path.c_str())) {
+                        m_Config->VideoPath = path;
+                        SetFM2PathFromVideoPath(m_Config);
+                    }
+                }
+            }
+        }
+        ImGui::End();
+    } else {
+        ret = false;
+    }
+    return ret;
+}

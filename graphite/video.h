@@ -34,6 +34,7 @@
 #include <chrono>
 #include <queue>
 
+#include "opencv2/opencv.hpp"
 
 #include "graphite/util.h"
 
@@ -193,9 +194,19 @@ public:
     std::string Information() override final;
 
 private:
-    std::string m_Input;
-    //std::unique_ptr<cv:videoCapture> m_Capture;
+    bool ReadNextFrame();
 
+private:
+    bool m_OnFirstFrame;
+    cv::Mat m_Frame;
+    double m_PTS;
+    int m_Width;
+    int m_Height;
+    int m_NumBytes;
+
+    std::string m_Input;
+    std::string m_Error;
+    std::unique_ptr<cv::VideoCapture> m_Capture;
 };
 
 
