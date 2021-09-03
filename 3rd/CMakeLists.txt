@@ -67,21 +67,6 @@ set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
 add_subdirectory(googletest)
 
 ################################################################################
-# zlib
-################################################################################
-add_subdirectory(zlib)
-set(ZLIB_INCLUDE_DIR
-    "${CMAKE_CURRENT_SOURCE_DIR}/zlib/"
-    "${CMAKE_BINARY_DIR}/3rd/zlib/"
-    PARENT_SCOPE
-)
-set(ZLIB_INCLUDE_DIR
-    "${CMAKE_CURRENT_SOURCE_DIR}/zlib/"
-    "${CMAKE_BINARY_DIR}/3rd/zlib/"
-)
-
-
-################################################################################
 # nestopia
 #   - Offload all the complexity of emulating a nintendo entertainment system
 ################################################################################

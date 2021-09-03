@@ -25,7 +25,7 @@ Linux
 Install dependencies (TODO add others)
 ```
 sudo apt install build-essential cmake git \
-    libavcodec-dev libavformat-dev libswscale-dev libv4l-dev \
+    libavcodec-dev libavformat-dev libswscale-dev libv4l-dev
 ```
 
 
@@ -56,29 +56,63 @@ cmake -G "Ninja" ..
 ```
 
 ```
-ninja -j6
+ninja -j8
 ```
 
 Windows
 -------
-#### One time setup
+#### Initial one time setup
 - Install Visual Studio 2019 community edition, other versions might work
 - Install cmake for windows: cmake.org/download, add to path for ease
-- Download and install [opencv](https://opencv.org/releases/)
-    - Click: Windows, Download it, Run the executable
-    - extract to "C:\opencv"
+- Install anaconda python distribution, make default / put on path
 
-#### Build
+
+#### Build opencv (should only need to do this once)
+```
+git clone https://github.com/opencv/opencv.git
+```
+
 ```
 "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvarsall.bat" amd64
+
+cd opencv
+mkdir build64
+cd build64
+cmake -D CMAKE_BUILD_TYPE=RELEASE -D BUILD_opencv_world=ON -A x64 ..
+msbuild INSTALL.vcxprox /p:Configuration=Release
+```
+
+
+```
+"C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvarsall.bat" x86
+
+cd opencv
+mkdir build32
+cd build64
+cmake -D CMAKE_BUILD_TYPE=RELEASE -D BUILD_opencv_world=ON -A Win32 ..
+msbuild INSTALL.vcxprox /p:Configuration=Release
+
+```
+
+#### Build graphite
+
+```
+"C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvarsall.bat" amd64
+cd graphite
+
+mkdir build64
+cd build64
+cmake -G "Visual Studio 16 2019" -D OpenCV_DIR="C:/repos/opencv/build64/install" -A x64 ..
+msbuild ALL_BUILD.vcxproj /p:Configuration=Release
+
 ```
 
 ```
-mkdir build
-cd build
-cmake -G "Visual Studio 16 2019" -A x64
-```
+"C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvarsall.bat" x86
+cd graphite
 
-```
-msbuild ALL_BUILD.vcxprox /p:Configuration=Release
+mkdir build32
+cd build32
+cmake -G "Visual Studio 16 2019" -D OpenCV_DIR="C:/repos/opencv/build32/install" -A Win32 ..
+msbuild ALL_BUILD.vcxproj /p:Configuration=Release
 ```

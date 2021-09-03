@@ -316,13 +316,13 @@ add_library(3rdnestopia STATIC
     "core/NstFds.cpp"
     "core/NstCheats.cpp"
 )
+target_compile_definitions(3rdnestopia PUBLIC
+    NST_NO_ZLIB
+)
 
 if(WIN32)
     set_target_properties(3rdnestopia
         PROPERTIES COMPILE_FLAGS "/wd4838 /wd4267 /wd5055 /wd4805"
-    )
-    target_include_directories(3rdnestopia PUBLIC
-        ${ZLIB_INCLUDE_DIR}
     )
 else()
     set_target_properties(3rdnestopia
@@ -331,6 +331,3 @@ else()
     )
 endif()
 
-target_link_libraries(3rdnestopia
-    zlib
-)
