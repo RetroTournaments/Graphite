@@ -36,7 +36,6 @@ using namespace graphite::rgmui;
 void graphite::rgmui::WindowAppMainLoop(
         Window* window, IApplication* application,
         util::mclock::duration minimumFrameDuration) {
-
     SDL_Event e;
     bool running = true;
     while (running) {
@@ -456,7 +455,7 @@ static bool SliderExt(T* v, T min, T max, bool allowArrowKeys, bool allowMouseWh
 
         if (m == 0 && allowMouseWheel) {
             auto& io = ImGui::GetIO();
-            m = static_cast<int>(-io.MouseWheel);
+            m = static_cast<T>(-io.MouseWheel);
         }
 
         m *= singleMove;
@@ -530,7 +529,7 @@ void graphite::rgmui::Mat(const char* label, const cv::Mat& img) {
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, img.cols, img.rows, 0,
             GL_BGR, GL_UNSIGNED_BYTE, img.data);
 
-    ImGui::Image((void*)(intptr_t)(q), ImVec2(img.cols, img.rows));
+    ImGui::Image((void*)(intptr_t)(q), ImVec2(static_cast<float>(img.cols), static_cast<float>(img.rows)));
 }
 
 

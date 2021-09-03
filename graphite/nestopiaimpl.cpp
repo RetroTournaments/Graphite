@@ -24,6 +24,7 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 
+#include <iostream>
 #include <exception>
 #include <sstream>
 
@@ -97,6 +98,7 @@ void NestopiaNESEmulator::ThrowOnBadResult(const char* method, Nes::Result r) co
     if (!(r == Nes::RESULT_OK || r == Nes::RESULT_NOP)) {
         std::ostringstream os;
         os << method << "  " << ResultToString(r);
+        std::cout << os.str() << std::endl;
         throw std::runtime_error(os.str());
     }
 }

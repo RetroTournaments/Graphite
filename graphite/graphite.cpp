@@ -104,7 +104,7 @@ nes::NESEmulatorFactorySPtr NESEmulatorComponent::InitializeEmulatorFactory(cons
             return std::move(std::make_unique<nes::NestopiaNESEmulator>());
         });
 
-    std::ifstream ifs(inesPath);
+    std::ifstream ifs(inesPath, std::ios::binary);
     if (!ifs.good()) {
         std::ostringstream os;
         os << "Unable to open INES file '" << inesPath << "'";
@@ -1081,25 +1081,27 @@ void VideoComponent::OnFrame() {
             }
         }
 
-        ImGui::Text("%s : %ld [%ld]", m_VideoPath.c_str(), m_CurrentVideoIndex, m_PTS[m_CurrentVideoIndex]);
-        ImGui::PushItemWidth(200);
-        if (ImGui::InputInt("offset pts", &m_Config->OffsetMillis)) {
-            SetOffset(m_Config->OffsetMillis);
-            FindTargetFrame(m_InputTarget);
-        }
-        ImGui::PopItemWidth();
-        ImGui::SameLine();
-        if (ImGui::Button("<")) {
-            UpdateOffset(-1);
-        }
-        ImGui::SameLine();
-        if (ImGui::Button(">")) {
-            UpdateOffset(1);
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("set reset")) {
-            SetOffset(m_PTS[m_CurrentVideoIndex]);
-            m_EventQueue->PublishI(EventType::SET_INPUT_TARGET_TO, 0);
+        if (m_CurrentVideoIndex >= 0 && m_CurrentVideoIndex < m_PTS.size()) {
+            ImGui::Text("%s : %ld [%ld]", m_VideoPath.c_str(), m_CurrentVideoIndex, m_PTS[m_CurrentVideoIndex]);
+            ImGui::PushItemWidth(200);
+            if (ImGui::InputInt("offset pts", &m_Config->OffsetMillis)) {
+                SetOffset(m_Config->OffsetMillis);
+                FindTargetFrame(m_InputTarget);
+            }
+            ImGui::PopItemWidth();
+            ImGui::SameLine();
+            if (ImGui::Button("<")) {
+                UpdateOffset(-1);
+            }
+            ImGui::SameLine();
+            if (ImGui::Button(">")) {
+                UpdateOffset(1);
+            }
+            ImGui::SameLine();
+            if (ImGui::Button("set reset")) {
+                SetOffset(m_PTS[m_CurrentVideoIndex]);
+                m_EventQueue->PublishI(EventType::SET_INPUT_TARGET_TO, 0);
+            }
         }
     }
     ImGui::End();

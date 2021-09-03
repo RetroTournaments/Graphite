@@ -33,11 +33,13 @@ using namespace graphite;
 
 int main(int argc, char** argv) {
     util::ArgNext(&argc, &argv); // Skip path argument
-
     GraphiteConfig config = GraphiteConfig::Defaults();
+
     rgmui::Window window(1920, 1080, "Graphite");
+
     if (!ParseArgumentsToConfig(&argc, &argv, &config)) {
         bool wasExited = false;
+
         GraphiteConfigApp cfgApp(&wasExited, &config);
         rgmui::WindowAppMainLoop(&window, &cfgApp, std::chrono::microseconds(10000));
 
@@ -52,8 +54,25 @@ int main(int argc, char** argv) {
 }
 
 #ifdef _WIN32
-int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmdshow)
-{
+void RedirectIO() {
+    if (!AttachConsole(ATTACH_PARENT_PROCESS)) {
+        //AllocConsole();
+    }
+
+    FILE* ignore;
+    freopen_s(&ignore, "CONIN$", "r", stdin);
+    freopen_s(&ignore, "CONOUT$", "w", stdout);
+    freopen_s(&ignore, "CONOUT$", "w", stderr);
+
+    std::cout.clear(); std::wcout.clear();
+    std::cin.clear();  std::wcin.clear();
+    std::cerr.clear(); std::wcerr.clear();
+
+    std::cout << std::endl;
+}
+
+int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmdshow) {
+    RedirectIO();
     return main(__argc, __argv);
 }
 #endif
