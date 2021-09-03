@@ -22,7 +22,9 @@
 cmake_minimum_required(VERSION 3.6)
 project(graphite)
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-anon-enum-enum-conversion")
+if (UNIX)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-anon-enum-enum-conversion")
+endif()
 
 ################################################################################
 # NES Lib
@@ -115,11 +117,11 @@ add_library(graphitelib
     graphite.cpp
 )
 target_link_libraries(graphitelib
-    neslib rgmuilib videolib stdc++fs
+    neslib rgmuilib videolib 
 )
 if (UNIX)
     target_link_libraries(rgmuilib
-        videolibextra
+        videolibextra stdc++fs
     )
 endif()
 

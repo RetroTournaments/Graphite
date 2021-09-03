@@ -342,7 +342,7 @@ LiveGetResult OpenCVInput::Get(uint8_t* buffer, int64_t* ptsMilliseconds) {
 
     m_OnFirstFrame = false;
     std::memcpy(buffer, m_Frame.data, m_NumBytes);
-    *ptsMilliseconds = std::round(m_PTS);
+    *ptsMilliseconds = static_cast<int64_t>(std::round(m_PTS));
     return LiveGetResult::SUCCESS;
 }
 
