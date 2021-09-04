@@ -2,5 +2,4 @@ build/
 build64/
 build32/
 *.swp
-deploy.sh
 deploy/

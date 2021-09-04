@@ -4,6 +4,10 @@ Graphite
 Graphite is a tool for turning recorded NES footage into an sequence of button
 presses that can be played back in an emulator. 
 
+Download
+--------
+[downloads](https://www.flibidydibidy.com/graphite)
+
 Contributing
 ------------
 Graphite is open source under the GPLv2 license. Contributions will be
