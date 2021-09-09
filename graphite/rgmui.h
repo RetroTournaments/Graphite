@@ -103,8 +103,11 @@ protected:
     void RegisterComponent(IApplicationComponent* component);
     void RegisterComponent(std::shared_ptr<IApplicationComponent> component);
 
+    ImGuiID GetDefaultDockspaceID();
+
 private:
     IApplicationConfig m_Config;
+    ImGuiID m_DockspaceID;
     std::vector<IApplicationComponent*> m_Components;
     std::vector<std::shared_ptr<IApplicationComponent>> m_OwnedComponents;
 };

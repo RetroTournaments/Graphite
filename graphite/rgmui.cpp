@@ -106,7 +106,7 @@ Window::Window(int winsizex, int winsizey, const std::string& name)
 
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-    io.ConfigWindowsMoveFromTitleBarOnly = true;
+    //io.ConfigWindowsMoveFromTitleBarOnly = true;
 }
 
 Window::~Window() {
@@ -202,6 +202,7 @@ IApplicationConfig IApplicationConfig::Defaults() {
 
 IApplication::IApplication(IApplicationConfig config) 
     : m_Config(config)
+    , m_DockspaceID(0)
 {
 }
 
@@ -222,9 +223,13 @@ bool IApplication::OnSDLEventExternal(const SDL_Event& e) {
     return r;
 }
 
+ImGuiID IApplication::GetDefaultDockspaceID() {
+    return m_DockspaceID;
+}
+
 bool IApplication::OnFrameExternal() {
     if (m_Config.DefaultDockspace) {
-        ImGui::DockSpaceOverViewport();
+        m_DockspaceID = ImGui::DockSpaceOverViewport();
     }
     bool r = OnFrame();
 

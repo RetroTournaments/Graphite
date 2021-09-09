@@ -34,8 +34,11 @@ using namespace graphite;
 int main(int argc, char** argv) {
     util::ArgNext(&argc, &argv); // Skip path argument
     GraphiteConfig config = GraphiteConfig::Defaults();
+    // TODO load config / window size / ImGui::IniSettings from a file
 
     rgmui::Window window(1920, 1080, "Graphite");
+    ImGuiIO& io = ImGui::GetIO();
+    io.IniFilename = NULL; 
 
     if (!ParseArgumentsToConfig(&argc, &argv, &config)) {
         bool wasExited = false;

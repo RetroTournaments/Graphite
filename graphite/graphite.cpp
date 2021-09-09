@@ -28,6 +28,7 @@
 namespace fs = std::experimental::filesystem;
 
 #include "fmt/core.h"
+#include "imgui_internal.h"
 
 #include "graphite/graphite.h"
 #include "graphite/nestopiaimpl.h"
@@ -39,6 +40,7 @@ GraphiteConfig GraphiteConfig::Defaults() {
     config.InputsCfg = InputsConfig::Defaults();
     config.EmuViewCfg = EmuViewConfig::Defaults();
     config.VideoCfg = VideoConfig::Defaults();
+    config.DoInitialDockspaceSetup = true;
     return config;
 }
 
@@ -59,6 +61,7 @@ bool graphite::ParseArgumentsToConfig(int* argc, char*** argv, GraphiteConfig* c
 
 GraphiteApp::GraphiteApp(GraphiteConfig* config) 
     : m_Config(config)
+    , m_FirstFrame(true)
 {
     RegisterComponent(std::make_shared<NESEmulatorComponent>(
                 &m_EventQueue, m_Config->InesPath, &m_Config->EmuViewCfg));
@@ -71,9 +74,59 @@ GraphiteApp::GraphiteApp(GraphiteConfig* config)
 GraphiteApp::~GraphiteApp() {
 }
 
+void GraphiteApp::SetupDockSpace() {
+    ImGuiViewport* viewport = ImGui::GetMainViewport();
+    ImGuiID dockspaceId = rgmui::IApplication::GetDefaultDockspaceID();
+    ImGui::DockBuilderRemoveNode(dockspaceId);
+    ImGui::DockBuilderAddNode(dockspaceId, ImGuiDockNodeFlags_DockSpace);
+    ImGui::DockBuilderSetNodeSize(dockspaceId, viewport->Size);
+
+    ImGuiID inputNode = ImGui::DockBuilderSplitNode(dockspaceId, ImGuiDir_Left, 0.2f, nullptr, &dockspaceId);
+    ImGuiID screenNode = ImGui::DockBuilderSplitNode(dockspaceId, ImGuiDir_Left, 0.5f, nullptr, &dockspaceId);
+
+    ImGui::DockBuilderDockWindow(InputsComponent::WindowName().c_str(), inputNode);
+    ImGui::DockBuilderDockWindow(ScreenPeekSubComponent::WindowName().c_str(), screenNode);
+    ImGui::DockBuilderDockWindow(VideoComponent::WindowName().c_str(), dockspaceId);
+
+    ImGui::DockBuilderFinish(dockspaceId);
+}
+
 bool GraphiteApp::OnFrame() {
+    if (m_FirstFrame) {
+        if (m_Config->DoInitialDockspaceSetup) {
+            SetupDockSpace();
+        }
+        m_FirstFrame = false;
+    }
+    if (!DoMainMenuBar()) {
+        return false;
+    }
     m_EventQueue.PumpQueue();
     return true;
+}
+
+bool GraphiteApp::DoMainMenuBar() {
+    bool ret = true;
+    if (ImGui::BeginMainMenuBar()) {
+        if (ImGui::BeginMenu("file")) {
+            if (ImGui::MenuItem("Save", "Ctrl+s")) {
+                //WriteFM2();
+            }
+            if (ImGui::MenuItem("Undo", "Ctrl+z")) {
+                //m_UndoRedo.Undo();
+            }
+            if (ImGui::MenuItem("Redo", "Ctrl+y")) {
+                //m_UndoRedo.Redo();
+            }
+            if (ImGui::MenuItem("Exit", "Ctrl+w")) {
+                ret = false;
+            }
+            ImGui::EndMenu();
+        }
+
+        ImGui::EndMainMenuBar();
+    }
+    return ret;
 }
 
 NESEmulatorComponent::NESEmulatorComponent(rgmui::EventQueue* queue, 
@@ -156,6 +209,7 @@ InputsConfig InputsConfig::Defaults() {
     cfg.ButtonWidth = 29;
     cfg.FrameTextNumDigits = 6;
     cfg.MaxInputSize = 40000;
+    cfg.ScrollOffset = 10;
     cfg.TextColor = IM_COL32(255, 255, 255, 128);
     cfg.HighlightTextColor = IM_COL32_WHITE;
     cfg.ButtonColor = IM_COL32(215, 25, 25, 255);
@@ -167,6 +221,7 @@ InputsComponent::InputsComponent(rgmui::EventQueue* queue,
         const std::string& fm2Path,
         InputsConfig* config)
     : m_EventQueue(queue)
+    , m_TargetScroller(this)
     , m_FM2Path(fm2Path)
     , m_Config(config)
     , m_UndoRedo(queue, &m_Inputs)
@@ -255,6 +310,15 @@ void InputsComponent::WriteFM2() {
     if (!offsetFound) {
         m_Header.additionalLines.push_back(OffsetLine());
     }
+    while (m_Inputs.size() > 1000 && m_Inputs.back() == 0) {
+        m_Inputs.pop_back();
+    }
+    if (m_Inputs.back() != 0) {
+        for (int i = 0; i < 10; i++) {
+            m_Inputs.push_back(0);
+        }
+    }
+
     nes::WriteFM2File(ofs, m_Inputs, m_Header);
 }
 
@@ -576,14 +640,32 @@ void InputsComponent::OnSDLEvent(const SDL_Event& e) {
     }
 }
 
+std::string InputsComponent::WindowName() {
+    return "Inputs";
+}
+
+void InputsComponent::DoMainMenuBar() {
+    if (ImGui::BeginMainMenuBar()) {
+        if (ImGui::BeginMenu("inputs")) {
+            ImGui::EndMenu();
+        }
+
+        ImGui::EndMainMenuBar();
+    }
+}
+
 void InputsComponent::OnFrame() {
-    if (ImGui::Begin("Inputs")) {
+    DoMainMenuBar();
+
+    if (ImGui::Begin(WindowName().c_str())) {
         m_AllowDragging = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
+        m_TargetScroller.DoButtons();
 
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
 
         ImGui::BeginChild("buttons", ImVec2(0, 0), true, ImGuiWindowFlags_NoMove);
+        m_TargetScroller.UpdateScroll();
 
         ImGuiListClipper clipper;
         clipper.Begin(static_cast<int>(m_Inputs.size()));
@@ -615,6 +697,45 @@ void InputsComponent::OnFrame() {
         }
     }
     ImGui::End();
+}
+
+InputsComponent::TargetScroller::TargetScroller(InputsComponent* inputs)
+    : m_InputsComponent(inputs)
+    , m_TargetScrollY(-1.0f)
+{
+}
+
+InputsComponent::TargetScroller::~TargetScroller() {
+}
+
+void InputsComponent::TargetScroller::DoButtons() {
+    if (ImGui::Button("center")) {
+        SetScrollDirectTo(m_InputsComponent->m_TargetIndex);
+    }
+}
+
+void InputsComponent::TargetScroller::UpdateScroll() {
+    m_CurrentY = ImGui::GetScrollY();
+    m_CurrentMaxY = ImGui::GetScrollMaxY();
+    m_CurrentLineSizeY = m_InputsComponent->CalcLineSize().y;
+    m_VisibleY = ImGui::GetContentRegionAvail().y;
+
+    if (m_TargetScrollY >= 0.0f) {
+        ImGui::SetScrollY(m_TargetScrollY);
+        m_TargetScrollY = -1.0f;
+    }
+}
+
+void InputsComponent::TargetScroller::SetScrollDirectTo(int target) {
+    float y = static_cast<float>(target) * m_CurrentMaxY / m_InputsComponent->m_Inputs.size() - m_VisibleY / 2;
+    if (y < 0.0f) {
+        y = 0.0f;
+    }
+    if (y > m_CurrentMaxY) {
+        y = m_CurrentMaxY;
+    }
+
+    m_TargetScrollY = y;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -808,8 +929,13 @@ void ScreenPeekSubComponent::SetBlankImage() {
             nes::FRAME_WIDTH * m_Config->ScreenMultiplier, CV_8UC3);
 }
 
+
+std::string ScreenPeekSubComponent::WindowName() {
+    return "Screen";
+}
+
 void ScreenPeekSubComponent::OnFrame() {
-    if (ImGui::Begin("Screen")) {
+    if (ImGui::Begin(WindowName().c_str())) {
         ImVec2 cursorPos = ImGui::GetCursorScreenPos();
         rgmui::Mat("screen", m_Image);
         if (ImGui::IsItemHovered()) {
@@ -1053,11 +1179,15 @@ void VideoComponent::UpdateOffset(int dx) {
     }
 }
 
+std::string VideoComponent::WindowName() {
+    return "Video";
+}
+
 void VideoComponent::OnFrame() {
     if (m_CurrentVideoIndex == -1) {
         FindTargetFrame(0);
     }
-    if (ImGui::Begin("Video")) {
+    if (ImGui::Begin(WindowName().c_str())) {
         rgmui::Mat("screen", m_Image);
         if (ImGui::IsItemHovered()) {
             auto& io = ImGui::GetIO();
@@ -1083,6 +1213,7 @@ void VideoComponent::OnFrame() {
 
         if (m_CurrentVideoIndex >= 0 && m_CurrentVideoIndex < m_PTS.size()) {
             ImGui::Text("%s : %ld [%ld]", m_VideoPath.c_str(), m_CurrentVideoIndex, m_PTS[m_CurrentVideoIndex]);
+
             ImGui::PushItemWidth(200);
             if (ImGui::InputInt("offset pts", &m_Config->OffsetMillis)) {
                 SetOffset(m_Config->OffsetMillis);

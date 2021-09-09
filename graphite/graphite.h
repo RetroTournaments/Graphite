@@ -84,6 +84,7 @@ struct InputsConfig {
     int ButtonWidth;
     int FrameTextNumDigits;
     int MaxInputSize;
+    int ScrollOffset;
 
     ImU32 TextColor;
     ImU32 HighlightTextColor;
@@ -140,18 +141,43 @@ public:
     virtual void OnFrame() override;
     virtual void OnSDLEvent(const SDL_Event& e) override;
 
+    static std::string WindowName();
+
+private:
+    class TargetScroller {
+    public:
+        TargetScroller(InputsComponent* inputs);
+        ~TargetScroller();
+
+        void DoButtons();
+        void UpdateScroll();
+
+    private:
+        void SetScrollDirectTo(int target);
+
+    private:
+        InputsComponent* m_InputsComponent;
+        float m_TargetScrollY;
+        float m_CurrentY;
+        float m_CurrentMaxY;
+        float m_VisibleY;
+        float m_CurrentLineSizeY;
+    };
+
 private:
     std::string FrameText(int frameId) const;
     ImVec2 CalcLineSize();
     void DoInputLine(int frameIndex);
     void DrawButton(ImDrawList* list, ImVec2 ul, ImVec2 lr, uint8_t button, bool buttonOn, bool highlighted);
     void DoInputList(ImVec2 screenPos, int startIndex, int endIndex);
+    void DoMainMenuBar();
 
     void ChangeInputTo(int frameIndex, nes::ControllerState newInput);
     void ChangeButtonTo(int frameIndex, uint8_t button, bool onoff);
     void ChangeTargetTo(int frameIndex);
     ImU32 TextColor(bool highlighted);
     std::string ButtonText(uint8_t button);
+
 
 private:
     std::string OffsetLine() const;
@@ -165,6 +191,7 @@ private:
 
 private:
     rgmui::EventQueue* m_EventQueue;
+    TargetScroller m_TargetScroller;
 
     ImVec2 m_LineSize;
     std::vector<int> m_ColumnX;
@@ -218,6 +245,8 @@ public:
 
     virtual void CacheNewEmulatorData(nes::INESEmulator* emu) override;
     virtual void OnFrame() override;
+
+    static std::string WindowName();
 
 private:
     void SetBlankImage();
@@ -284,6 +313,8 @@ public:
 
     virtual void OnFrame() override;
 
+    static std::string WindowName();
+
 private:
     int64_t FrameIndexToPTS(int frameIndex);
     int PTSToFrameIndex(int64_t pts);
@@ -312,12 +343,14 @@ private:
 };
 
 ////////////////////////////////////////////////////////////////////////////////
-// Graphite App
+// Graphite Config
 ////////////////////////////////////////////////////////////////////////////////
 struct GraphiteConfig {
     std::string InesPath;
     std::string VideoPath;
     std::string FM2Path;
+
+    bool DoInitialDockspaceSetup;
 
     InputsConfig InputsCfg;
     EmuViewConfig EmuViewCfg;
@@ -327,20 +360,6 @@ struct GraphiteConfig {
 };
 bool ParseArgumentsToConfig(int* argc, char*** argv, GraphiteConfig* config);
 void SetFM2PathFromVideoPath(GraphiteConfig* config);
-
-class GraphiteApp : public rgmui::IApplication {
-public:
-    GraphiteApp(GraphiteConfig* config);
-    ~GraphiteApp();
-
-    virtual bool OnFrame() override;
-
-private:
-    GraphiteConfig* m_Config;
-    rgmui::EventQueue m_EventQueue;
-};
-
-
 class GraphiteConfigApp : public rgmui::IApplication {
 public:
     GraphiteConfigApp(bool* wasExited, GraphiteConfig* config);
@@ -358,7 +377,25 @@ private:
     std::vector<std::string> m_PossibleVideoPaths;
 };
 
+////////////////////////////////////////////////////////////////////////////////
+// Graphite App
+////////////////////////////////////////////////////////////////////////////////
+class GraphiteApp : public rgmui::IApplication {
+public:
+    GraphiteApp(GraphiteConfig* config);
+    ~GraphiteApp();
 
+    virtual bool OnFrame() override;
+
+private:
+    void SetupDockSpace();
+    bool DoMainMenuBar();
+
+private:
+    bool m_FirstFrame;
+    GraphiteConfig* m_Config;
+    rgmui::EventQueue m_EventQueue;
+};
 
 }
 
