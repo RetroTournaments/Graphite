@@ -376,6 +376,12 @@ void EventQueue::Subscribe(int etype, EventCallback cback) {
     m_Callbacks[etype].push_back(cback);
 }
 
+void EventQueue::Subscribe(int etype, std::function<void()> cback) {
+    m_Callbacks[etype].push_back([cback](const Event&){
+        cback();
+    });
+}
+
 void EventQueue::SubscribeI(int etype, std::function<void(int v)> cback) {
     Subscribe(etype, [cback](const Event& e){
         cback(*reinterpret_cast<int*>(e.Data.get()));

@@ -150,6 +150,7 @@ public:
     void PublishS(int etype, std::string dataStr);
     void Publish(Event e);
     void Subscribe(int etype, EventCallback cback);
+    void Subscribe(int etype, std::function<void()> cback);
     void SubscribeI(int etype, std::function<void(int v)> cback);
     void SubscribeS(int etype, std::function<void(const std::string& v)> cback);
 

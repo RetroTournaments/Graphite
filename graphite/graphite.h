@@ -55,6 +55,8 @@ enum EventType : int {
     INPUT_SET_TO, // InputChangeEvent
     OFFSET_SET_TO, // int
     SET_OFFSET_TO, // int
+
+    REQUEST_SAVE
 };
 
 struct EmuViewConfig;
@@ -154,14 +156,17 @@ private:
 
     private:
         void SetScrollDirectTo(int target);
+        float TargetY(int target);
 
     private:
         InputsComponent* m_InputsComponent;
+        bool m_AutoScroll;
+        bool m_ScrolledNext;
+        int m_LastScrollTarget;
+        float m_LastScrollY;
         float m_TargetScrollY;
-        float m_CurrentY;
         float m_CurrentMaxY;
         float m_VisibleY;
-        float m_CurrentLineSizeY;
     };
 
 private:
@@ -340,6 +345,17 @@ private:
     std::vector<int64_t> m_PTS;
     video::LiveInputFramePtr m_LiveInputFrame;
     cv::Mat m_Image;
+};
+
+class PlaybackComponent : public rgmui::IApplicationComponent {
+public:
+    PlaybackComponent(rgmui::EventQueue* queue);
+    ~PlaybackComponent();
+
+    virtual void OnFrame() override;
+
+private:
+    rgmui::EventQueue* m_EventQueue;
 };
 
 ////////////////////////////////////////////////////////////////////////////////

@@ -69,6 +69,8 @@ GraphiteApp::GraphiteApp(GraphiteConfig* config)
                 &m_EventQueue, m_Config->FM2Path, &m_Config->InputsCfg));
     RegisterComponent(std::make_shared<VideoComponent>(
                 &m_EventQueue, m_Config->VideoPath, &m_Config->VideoCfg));
+    RegisterComponent(std::make_shared<PlaybackComponent>(
+                &m_EventQueue));
 }
 
 GraphiteApp::~GraphiteApp() {
@@ -81,7 +83,7 @@ void GraphiteApp::SetupDockSpace() {
     ImGui::DockBuilderAddNode(dockspaceId, ImGuiDockNodeFlags_DockSpace);
     ImGui::DockBuilderSetNodeSize(dockspaceId, viewport->Size);
 
-    ImGuiID inputNode = ImGui::DockBuilderSplitNode(dockspaceId, ImGuiDir_Left, 0.2f, nullptr, &dockspaceId);
+    ImGuiID inputNode = ImGui::DockBuilderSplitNode(dockspaceId, ImGuiDir_Left, 0.18f, nullptr, &dockspaceId);
     ImGuiID screenNode = ImGui::DockBuilderSplitNode(dockspaceId, ImGuiDir_Left, 0.5f, nullptr, &dockspaceId);
 
     ImGui::DockBuilderDockWindow(InputsComponent::WindowName().c_str(), inputNode);
@@ -110,13 +112,7 @@ bool GraphiteApp::DoMainMenuBar() {
     if (ImGui::BeginMainMenuBar()) {
         if (ImGui::BeginMenu("file")) {
             if (ImGui::MenuItem("Save", "Ctrl+s")) {
-                //WriteFM2();
-            }
-            if (ImGui::MenuItem("Undo", "Ctrl+z")) {
-                //m_UndoRedo.Undo();
-            }
-            if (ImGui::MenuItem("Redo", "Ctrl+y")) {
-                //m_UndoRedo.Redo();
+                m_EventQueue.Publish(EventType::REQUEST_SAVE);
             }
             if (ImGui::MenuItem("Exit", "Ctrl+w")) {
                 ret = false;
@@ -228,7 +224,7 @@ InputsComponent::InputsComponent(rgmui::EventQueue* queue,
     , m_Inputs(1000, 0)
     , m_AllowDragging(true)
     , m_TargetDragging(false)
-    , m_LockTarget(-1)
+    , m_LockTarget(0)
     , m_CouldToggleLock(false)
     , m_TargetIndex(0)
     , m_CurrentIndex(0)
@@ -246,13 +242,18 @@ InputsComponent::InputsComponent(rgmui::EventQueue* queue,
             q = static_cast<int>(m_Inputs.size()) - 1;
         }
 
-        ChangeTargetTo(q);
+        if (q != m_TargetIndex) {
+            ChangeTargetTo(q);
+        }
     });
     queue->SubscribeI(EventType::NES_FRAME_SET_TO, [&](int v){
         m_CurrentIndex = v;
     });
     queue->SubscribeI(EventType::OFFSET_SET_TO, [&](int v){
         m_OffsetMillis = v;
+    });
+    queue->Subscribe(EventType::REQUEST_SAVE, [&](){
+        WriteFM2();
     });
 
     TryReadFM2();
@@ -563,12 +564,6 @@ void InputsComponent::DoInputLine(int frameIndex) {
         ImGui::OpenPopupOnItemClick("frame_popup");
     }
     if (ImGui::BeginPopup("frame_popup")) {
-        if (ImGui::MenuItem(fmt::format("lock {}", frameIndex).c_str())) {
-            m_LockTarget = frameIndex;
-        }
-        if (ImGui::MenuItem("unlock")) {
-            m_LockTarget = -1;
-        }
         if (ImGui::MenuItem(fmt::format("clear {}", frameIndex).c_str())) {
             ChangeInputTo(frameIndex, 0x00);
         }
@@ -629,14 +624,16 @@ void InputsComponent::DragInfo::Clear() {
 }
 
 void InputsComponent::OnSDLEvent(const SDL_Event& e) {
-    if (rgmui::KeyDownWithCtrl(e, SDLK_z)) {
-        m_UndoRedo.Undo();
-    }
-    if (rgmui::KeyDownWithCtrl(e, SDLK_y)) {
-        m_UndoRedo.Redo();
-    }
-    if (rgmui::KeyDownWithCtrl(e, SDLK_s)) {
-        WriteFM2();
+    auto& io = ImGui::GetIO();
+    if (!io.WantCaptureKeyboard) {
+        if (rgmui::KeyDownWithCtrl(e, SDLK_z)) {
+            m_UndoRedo.Undo();
+        } else if (rgmui::KeyDownWithCtrl(e, SDLK_y)) {
+            m_UndoRedo.Redo();
+        }
+        else if (rgmui::KeyDownWithCtrl(e, SDLK_s)) {
+            WriteFM2();
+        }
     }
 }
 
@@ -647,6 +644,12 @@ std::string InputsComponent::WindowName() {
 void InputsComponent::DoMainMenuBar() {
     if (ImGui::BeginMainMenuBar()) {
         if (ImGui::BeginMenu("inputs")) {
+            if (ImGui::MenuItem("Undo", "Ctrl+z")) {
+                m_UndoRedo.Undo();
+            }
+            if (ImGui::MenuItem("Redo", "Ctrl+y")) {
+                m_UndoRedo.Redo();
+            }
             ImGui::EndMenu();
         }
 
@@ -701,7 +704,12 @@ void InputsComponent::OnFrame() {
 
 InputsComponent::TargetScroller::TargetScroller(InputsComponent* inputs)
     : m_InputsComponent(inputs)
+    , m_AutoScroll(true)
     , m_TargetScrollY(-1.0f)
+    , m_CurrentMaxY(0)
+    , m_VisibleY(0)
+    , m_LastScrollY(0)
+    , m_LastScrollTarget(0)
 {
 }
 
@@ -709,33 +717,50 @@ InputsComponent::TargetScroller::~TargetScroller() {
 }
 
 void InputsComponent::TargetScroller::DoButtons() {
-    if (ImGui::Button("center")) {
+    if (ImGui::Button("scroll to target")) {
+        SetScrollDirectTo(m_InputsComponent->m_TargetIndex);
+    }
+
+    ImGui::SameLine();
+    if (ImGui::Checkbox("auto-scroll", &m_AutoScroll) && m_AutoScroll) {
         SetScrollDirectTo(m_InputsComponent->m_TargetIndex);
     }
 }
 
 void InputsComponent::TargetScroller::UpdateScroll() {
-    m_CurrentY = ImGui::GetScrollY();
+    if (!m_ScrolledNext && (ImGui::GetScrollY() != m_LastScrollY)) {
+        m_AutoScroll = false; // User scrolled by themselves
+    }
+    m_ScrolledNext = false;
     m_CurrentMaxY = ImGui::GetScrollMaxY();
-    m_CurrentLineSizeY = m_InputsComponent->CalcLineSize().y;
     m_VisibleY = ImGui::GetContentRegionAvail().y;
+    
+    if (m_AutoScroll && (m_InputsComponent->m_TargetIndex != m_LastScrollTarget)) {
+        SetScrollDirectTo(m_InputsComponent->m_TargetIndex);
+    }
 
     if (m_TargetScrollY >= 0.0f) {
         ImGui::SetScrollY(m_TargetScrollY);
         m_TargetScrollY = -1.0f;
+        m_ScrolledNext = true;
     }
+    m_LastScrollY = ImGui::GetScrollY();
 }
 
-void InputsComponent::TargetScroller::SetScrollDirectTo(int target) {
-    float y = static_cast<float>(target) * m_CurrentMaxY / m_InputsComponent->m_Inputs.size() - m_VisibleY / 2;
+float InputsComponent::TargetScroller::TargetY(int target) {
+    float y = static_cast<float>(target) * (m_CurrentMaxY + m_VisibleY) / m_InputsComponent->m_Inputs.size() - m_VisibleY / 2;
     if (y < 0.0f) {
         y = 0.0f;
     }
     if (y > m_CurrentMaxY) {
         y = m_CurrentMaxY;
     }
+    return y;
+}
 
-    m_TargetScrollY = y;
+void InputsComponent::TargetScroller::SetScrollDirectTo(int target) {
+    m_TargetScrollY = TargetY(target);
+    m_LastScrollTarget = target;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1212,10 +1237,10 @@ void VideoComponent::OnFrame() {
         }
 
         if (m_CurrentVideoIndex >= 0 && m_CurrentVideoIndex < m_PTS.size()) {
-            ImGui::Text("%s : %ld [%ld]", m_VideoPath.c_str(), m_CurrentVideoIndex, m_PTS[m_CurrentVideoIndex]);
+            //ImGui::Text("%s : %ld [%ld]", m_VideoPath.c_str(), m_CurrentVideoIndex, m_PTS[m_CurrentVideoIndex]);
 
-            ImGui::PushItemWidth(200);
-            if (ImGui::InputInt("offset pts", &m_Config->OffsetMillis)) {
+            ImGui::PushItemWidth(120);
+            if (ImGui::InputInt("sync", &m_Config->OffsetMillis)) {
                 SetOffset(m_Config->OffsetMillis);
                 FindTargetFrame(m_InputTarget);
             }
@@ -1229,7 +1254,7 @@ void VideoComponent::OnFrame() {
                 UpdateOffset(1);
             }
             ImGui::SameLine();
-            if (ImGui::Button("set reset")) {
+            if (ImGui::Button("reset here")) {
                 SetOffset(m_PTS[m_CurrentVideoIndex]);
                 m_EventQueue->PublishI(EventType::SET_INPUT_TARGET_TO, 0);
             }
@@ -1240,13 +1265,57 @@ void VideoComponent::OnFrame() {
 
 ////////////////////////////////////////////////////////////////////////////////
 
+PlaybackComponent::PlaybackComponent(rgmui::EventQueue* queue)
+    : m_EventQueue(queue)
+{
+}
+
+PlaybackComponent::~PlaybackComponent() {
+}
+
+void PlaybackComponent::OnFrame() {
+    auto& io = ImGui::GetIO();
+    int dx = 0;
+    if (!io.WantCaptureKeyboard) {
+        if (ImGui::IsKeyPressed(SDL_SCANCODE_LEFT)) {
+            dx = -1;
+        } else if (ImGui::IsKeyPressed(SDL_SCANCODE_RIGHT)) {
+            dx =  1;
+        } else if (ImGui::IsKeyPressed(SDL_SCANCODE_UP)) {
+            dx = -8;
+        } else if (ImGui::IsKeyPressed(SDL_SCANCODE_DOWN)) {
+            dx =  8;
+        } else if (ImGui::IsKeyPressed(SDL_SCANCODE_PAGEUP)) {
+            dx = -64;
+        } else if (ImGui::IsKeyPressed(SDL_SCANCODE_PAGEDOWN)) {
+            dx =  64;
+        }
+
+        if (rgmui::ShiftIsDown()) {
+            dx *= 4;
+        }
+        if (dx) {
+            m_EventQueue->PublishI(EventType::SCROLL_INPUT_TARGET, dx);
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+static bool IsValidINESExtension(const std::string& extension) {
+    return extension == ".nes" || extension == ".NES";
+}
+static bool IsValidVideoExtension(const std::string& extension) {
+    return extension == ".mp4" || extension == ".mkv";
+}
+
 GraphiteConfigApp::GraphiteConfigApp(bool* wasExited, GraphiteConfig* config)
     : rgmui::IApplication(ThisApplicationConfig())
     , m_WasExited(wasExited)
     , m_Config(config)
 {
     for (const auto & entry : fs::directory_iterator(".")) {
-        if (entry.path().extension().string() == ".nes") {
+        if (IsValidINESExtension(entry.path().extension().string())) {
             m_PossibleInesPaths.push_back(entry.path().string());
         }
     }
@@ -1254,9 +1323,8 @@ GraphiteConfigApp::GraphiteConfigApp(bool* wasExited, GraphiteConfig* config)
         m_Config->InesPath = m_PossibleInesPaths.front();
     }
 
-
     for (const auto & entry : fs::directory_iterator(".")) {
-        if (entry.path().extension().string() == ".mp4") {
+        if (IsValidVideoExtension(entry.path().extension().string())) {
             m_PossibleVideoPaths.push_back(entry.path().string());
         }
     }
@@ -1264,7 +1332,6 @@ GraphiteConfigApp::GraphiteConfigApp(bool* wasExited, GraphiteConfig* config)
         m_Config->VideoPath = m_PossibleVideoPaths.front();
         SetFM2PathFromVideoPath(m_Config);
     }
-
 }
 
 GraphiteConfigApp::~GraphiteConfigApp() {
