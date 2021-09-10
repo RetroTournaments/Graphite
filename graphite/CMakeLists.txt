@@ -117,7 +117,7 @@ add_library(graphitelib
     graphite.cpp
 )
 target_link_libraries(graphitelib
-    neslib rgmuilib videolib 
+    neslib rgmuilib videolib spdlog::spdlog
 )
 if (UNIX)
     target_link_libraries(rgmuilib

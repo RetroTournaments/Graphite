@@ -26,33 +26,59 @@
 
 #include <iostream>
 
+#include "spdlog/spdlog.h"
+#include "spdlog/sinks/stdout_color_sinks.h"
+#include "spdlog/sinks/basic_file_sink.h"
+
 #include "graphite/graphite.h"
 #include "graphite/rgmui.h"
 
 using namespace graphite;
 
+static void InitializeDefaultLogger() {
+    auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
+    auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>("graphite.log", true);
+    std::vector<std::shared_ptr<spdlog::sinks::sink>> sinks = {console_sink, file_sink};
+    auto logger = std::make_shared<spdlog::logger>("graphite", sinks.begin(), sinks.end());
+    spdlog::set_default_logger(logger);
+}
+
 int main(int argc, char** argv) {
+    InitializeDefaultLogger();
+    spdlog::info("program started");
+
     util::ArgNext(&argc, &argv); // Skip path argument
     GraphiteConfig config = GraphiteConfig::Defaults();
     // TODO load config / window size / ImGui::IniSettings from a file
 
     rgmui::Window window(1920, 1080, "Graphite");
+    spdlog::info("window created");
     ImGuiIO& io = ImGui::GetIO();
     io.IniFilename = NULL; 
 
+    bool wasExited = false;
     if (!ParseArgumentsToConfig(&argc, &argv, &config)) {
-        bool wasExited = false;
+        spdlog::warn("did not parse command line arguments");
 
         GraphiteConfigApp cfgApp(&wasExited, &config);
         rgmui::WindowAppMainLoop(&window, &cfgApp, std::chrono::microseconds(10000));
-
-        if (wasExited) {
-            return 0;
-        }
     }
 
-    GraphiteApp app(&config);
-    rgmui::WindowAppMainLoop(&window, &app, std::chrono::microseconds(10000));
+    if (!wasExited) {
+        spdlog::info("config completed");
+        spdlog::info("ines path: {}", config.InesPath);
+        spdlog::info("video path: {}", config.VideoPath);
+        spdlog::info("fm2 path: {}", config.FM2Path);
+
+        try {
+            GraphiteApp app(&config);
+            spdlog::info("main loop initiated");
+            rgmui::WindowAppMainLoop(&window, &app, std::chrono::microseconds(10000));
+        } catch(std::exception e) {
+            spdlog::error("exception: '{}'", e.what());
+        }
+    }
+    spdlog::info("program ended");
     return 0;
 }
 

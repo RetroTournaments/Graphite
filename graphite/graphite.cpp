@@ -29,9 +29,11 @@ namespace fs = std::experimental::filesystem;
 
 #include "fmt/core.h"
 #include "imgui_internal.h"
+#include "spdlog/spdlog.h"
 
 #include "graphite/graphite.h"
 #include "graphite/nestopiaimpl.h"
+
 
 using namespace graphite;
 
@@ -65,18 +67,23 @@ GraphiteApp::GraphiteApp(GraphiteConfig* config)
 {
     RegisterComponent(std::make_shared<NESEmulatorComponent>(
                 &m_EventQueue, m_Config->InesPath, &m_Config->EmuViewCfg));
+    spdlog::info("registered NESEmulatorComponent");
     RegisterComponent(std::make_shared<InputsComponent>(
                 &m_EventQueue, m_Config->FM2Path, &m_Config->InputsCfg));
+    spdlog::info("registered InputsComponent");
     RegisterComponent(std::make_shared<VideoComponent>(
                 &m_EventQueue, m_Config->VideoPath, &m_Config->VideoCfg));
+    spdlog::info("registered VideoComponent");
     RegisterComponent(std::make_shared<PlaybackComponent>(
                 &m_EventQueue));
+    spdlog::info("registered PlaybackComponent");
 }
 
 GraphiteApp::~GraphiteApp() {
 }
 
 void GraphiteApp::SetupDockSpace() {
+    spdlog::info("using default dock configuration");
     ImGuiViewport* viewport = ImGui::GetMainViewport();
     ImGuiID dockspaceId = rgmui::IApplication::GetDefaultDockspaceID();
     ImGui::DockBuilderRemoveNode(dockspaceId);
@@ -320,6 +327,7 @@ void InputsComponent::WriteFM2() {
         }
     }
 
+    spdlog::info("written fm2 to '{}' sync offset: '{}'", m_FM2Path, m_OffsetMillis);
     nes::WriteFM2File(ofs, m_Inputs, m_Header);
 }
 
@@ -1092,9 +1100,23 @@ VideoComponent::VideoComponent(rgmui::EventQueue* queue,
         SetOffset(v);
     });
 
+    {
+        std::ifstream ifs(videoPath);
+        if (!ifs.good()) {
+            std::ostringstream os;
+            os << "Unable to open Video file '" << videoPath << "'";
+            throw std::runtime_error(os.str());
+        }
+    }
+
     m_VideoThread = std::make_unique<video::LiveInputThread>(
                 std::make_unique<video::OpenCVInput>(videoPath),
                 m_Config->MaxFrames, false);
+
+    if (m_VideoThread->HasError()) {
+        throw std::runtime_error(m_VideoThread->GetError());
+    }
+    spdlog::info("inputs information: {}", m_VideoThread->InputInformation());
     SetBlankImage();
 }
 
