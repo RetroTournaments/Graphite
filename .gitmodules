@@ -10,3 +10,6 @@
 [submodule "3rd/SDL"]
 	path = 3rd/SDL
 	url = https://github.com/libsdl-org/SDL.git
+[submodule "3rd/spdlog"]
+	path = 3rd/spdlog
+	url = https://github.com/gabime/spdlog.git

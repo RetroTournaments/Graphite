@@ -86,3 +86,12 @@ set(fmt_INCLUDE_DIRS
     PARENT_SCOPE
 )
 
+################################################################################
+# spdlog
+################################################################################
+add_subdirectory(spdlog)
+set(spdlog_INCLUDE_DIRS
+    "${CMAKE_CURRENT_SOURCE_DIR}/spdlog/include/"
+    PARENT_SCOPE
+)
+
