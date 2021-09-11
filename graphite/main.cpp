@@ -74,7 +74,7 @@ int main(int argc, char** argv) {
             GraphiteApp app(&config);
             spdlog::info("main loop initiated");
             rgmui::WindowAppMainLoop(&window, &app, std::chrono::microseconds(10000));
-        } catch(std::exception e) {
+        } catch(const std::exception& e) {
             spdlog::error("exception: '{}'", e.what());
         }
     }

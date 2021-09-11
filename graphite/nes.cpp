@@ -486,6 +486,19 @@ static bool StringStartsWith(const std::string& str, const std::string& start) {
     return false;
 }
 
+static bool GetLine(std::istream& is, std::string& line) {
+    if (!std::getline(is, line)) {
+        return false;
+    }
+    if (line.length() > 1) {
+        if (line.back() == '\r') {
+            line.pop_back();
+        }
+    }
+
+    return true;
+}
+
 void graphite::nes::ReadFM2File(std::istream& is,
         std::vector<nes::ControllerState>* inputs,
         FM2Header* header) {
@@ -494,7 +507,7 @@ void graphite::nes::ReadFM2File(std::istream& is,
     }
 
     std::string line;
-    if (!std::getline(is, line) || line != "version 3") {
+    if (!GetLine(is, line) || line != "version 3") {
         throw std::invalid_argument("unsupported fm2 file"); 
     }
 
@@ -504,7 +517,7 @@ void graphite::nes::ReadFM2File(std::istream& is,
         inputs->clear();
     }
     bool firstInput = true;
-    while (std::getline(is, line)) {
+    while (GetLine(is, line)) {
         if (!readingInputs) {
             if (StringStartsWith(line, "|")) {
                 readingInputs = true;
