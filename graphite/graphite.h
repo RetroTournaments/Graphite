@@ -89,6 +89,8 @@ struct InputsConfig {
     int MaxInputSize;
     int ScrollOffset;
 
+    bool StickyAutoScroll;
+
     ImU32 TextColor;
     ImU32 HighlightTextColor;
     ImU32 ButtonColor;
@@ -156,6 +158,7 @@ private:
         void UpdateScroll();
 
         void SuspendAutoScroll();
+        void OnTargetChange(bool byChevronColumn);
 
     private:
         void SetScrollDirectTo(int target);
@@ -164,6 +167,7 @@ private:
     private:
         InputsComponent* m_InputsComponent;
         bool m_AutoScroll;
+        bool m_AutoScrollWasSetOnByUser;
         bool m_ScrolledNext;
         int m_LastScrollTarget;
         float m_LastScrollY;
@@ -182,7 +186,7 @@ private:
 
     void ChangeInputTo(int frameIndex, nes::ControllerState newInput);
     void ChangeButtonTo(int frameIndex, uint8_t button, bool onoff);
-    void ChangeTargetTo(int frameIndex);
+    void ChangeTargetTo(int frameIndex, bool byChevronColumn);
     ImU32 TextColor(bool highlighted);
     std::string ButtonText(uint8_t button);
 

@@ -134,13 +134,14 @@ bool GraphiteApp::DoMainMenuBar() {
 
         if (ImGui::BeginMenu("config")) {
             int size = m_Config->VideoCfg.ScreenMultiplier;
-            ImGui::PushItemWidth(50);
-            if (ImGui::SliderInt("Screen Size", &size, 1, 5)) {
+            ImGui::PushItemWidth(68);
+            if (ImGui::SliderInt("Screen size", &size, 1, 5)) {
                 m_Config->VideoCfg.ScreenMultiplier = size;
                 m_Config->EmuViewCfg.ScreenPeekCfg.ScreenMultiplier = size;
                 m_EventQueue.Publish(EventType::REFRESH_CONFIG);
             }
             ImGui::PopItemWidth();
+            ImGui::Checkbox("Sticky auto-scroll", &m_Config->InputsCfg.StickyAutoScroll);
             ImGui::EndMenu();
         }
 
@@ -233,6 +234,7 @@ InputsConfig InputsConfig::Defaults() {
     cfg.TextColor = IM_COL32(255, 255, 255, 128);
     cfg.HighlightTextColor = IM_COL32_WHITE;
     cfg.ButtonColor = IM_COL32(215, 25, 25, 255);
+    cfg.StickyAutoScroll = true;
 
     return cfg;
 }
@@ -255,7 +257,7 @@ InputsComponent::InputsComponent(rgmui::EventQueue* queue,
 {
     m_Drag.Clear();
     queue->SubscribeI(EventType::SET_INPUT_TARGET_TO, [&](int v){
-        ChangeTargetTo(v);
+        ChangeTargetTo(v, false);
     });
     queue->SubscribeI(EventType::SCROLL_INPUT_TARGET, [&](int v){
         int q = m_TargetIndex + v;
@@ -267,7 +269,7 @@ InputsComponent::InputsComponent(rgmui::EventQueue* queue,
         }
 
         if (q != m_TargetIndex) {
-            ChangeTargetTo(q);
+            ChangeTargetTo(q, false);
         }
     });
     queue->SubscribeI(EventType::NES_FRAME_SET_TO, [&](int v){
@@ -392,7 +394,7 @@ std::string InputsComponent::ButtonText(uint8_t button) {
     return bt;
 }
 
-void InputsComponent::ChangeTargetTo(int frameIndex) {
+void InputsComponent::ChangeTargetTo(int frameIndex, bool byChevronColumn) {
     if (frameIndex < 0) {
         frameIndex = 0;
     }
@@ -402,6 +404,7 @@ void InputsComponent::ChangeTargetTo(int frameIndex) {
     if (frameIndex != m_TargetIndex) {
         m_TargetIndex = frameIndex;
         m_EventQueue->PublishI(EventType::INPUT_TARGET_SET_TO, m_TargetIndex);
+        m_TargetScroller.OnTargetChange(byChevronColumn);
     }
 }
 
@@ -488,7 +491,7 @@ void InputsComponent::DoInputLine(int frameIndex) {
         }
 
         m_TargetDragging = true;
-        ChangeTargetTo(frameIndex);
+        ChangeTargetTo(frameIndex, true);
     }
     if (m_CouldToggleLock && m_TargetDragging &&
         dragDeltal.x == 0 && dragDeltal.y == 0 &&
@@ -605,7 +608,7 @@ void InputsComponent::DoInputLine(int frameIndex) {
 
 void InputsComponent::ChangeInputTo(int frameIndex, nes::ControllerState newState) {
     if (m_LockTarget == -1) {
-        ChangeTargetTo(frameIndex);
+        ChangeTargetTo(frameIndex, false);
     }
     if (m_Drag.HighlightedFrames.find(frameIndex) == m_Drag.HighlightedFrames.end()) {
         m_UndoRedo.ChangeInputTo(frameIndex, newState);
@@ -732,6 +735,7 @@ void InputsComponent::OnFrame() {
 InputsComponent::TargetScroller::TargetScroller(InputsComponent* inputs)
     : m_InputsComponent(inputs)
     , m_AutoScroll(true)
+    , m_AutoScrollWasSetOnByUser(true)
     , m_TargetScrollY(-1.0f)
     , m_CurrentMaxY(0)
     , m_VisibleY(0)
@@ -749,8 +753,11 @@ void InputsComponent::TargetScroller::DoButtons() {
     }
 
     ImGui::SameLine();
-    if (ImGui::Checkbox("auto-scroll", &m_AutoScroll) && m_AutoScroll) {
-        SetScrollDirectTo(m_InputsComponent->m_TargetIndex);
+    if (ImGui::Checkbox("auto-scroll", &m_AutoScroll)) {
+        if (m_AutoScroll) {
+            SetScrollDirectTo(m_InputsComponent->m_TargetIndex);
+        }
+        m_AutoScrollWasSetOnByUser = m_AutoScroll;
     }
 }
 
@@ -792,6 +799,12 @@ void InputsComponent::TargetScroller::SetScrollDirectTo(int target) {
 
 void InputsComponent::TargetScroller::SuspendAutoScroll() {
     m_AutoScroll = false;
+}
+
+void InputsComponent::TargetScroller::OnTargetChange(bool byChevronColumn) {
+    if (!byChevronColumn && m_AutoScrollWasSetOnByUser && m_InputsComponent->m_Config->StickyAutoScroll) {
+        m_AutoScroll = true;
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
