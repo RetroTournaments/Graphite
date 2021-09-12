@@ -1226,6 +1226,11 @@ void VideoComponent::SetImageFromInputFrame() {
 void VideoComponent::SetVideoFrame(int videoIndex) {
     m_CurrentVideoIndex = videoIndex;
     m_LiveInputFrame = m_VideoThread->GetFrame(m_CurrentVideoIndex);
+    if (m_LiveInputFrame->Height != nes::FRAME_HEIGHT || m_LiveInputFrame->Width != nes::FRAME_WIDTH) {
+        throw std::runtime_error(fmt::format("Invalid video frame size '{}x{}'. Must be '{}x{}'",
+            m_LiveInputFrame->Width, m_LiveInputFrame->Height, nes::FRAME_WIDTH, nes::FRAME_HEIGHT));
+
+    }
     SetImageFromInputFrame();
 }
 
