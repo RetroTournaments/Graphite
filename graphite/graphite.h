@@ -361,8 +361,19 @@ public:
 
     virtual void OnFrame() override;
 
+    static std::string WindowName();
+
+private:
+    void HandleHotkeys();
+    void HandlePlaying();
+    void TogglePlaying();
+
 private:
     rgmui::EventQueue* m_EventQueue;
+    float m_PlaybackSpeed;
+    bool m_IsPlaying;
+    util::mclock::time_point m_LastTime;
+    util::mclock::duration m_Accumulator;
 };
 
 ////////////////////////////////////////////////////////////////////////////////

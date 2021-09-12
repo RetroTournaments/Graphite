@@ -97,10 +97,12 @@ void GraphiteApp::SetupDockSpace() {
 
     ImGuiID inputNode = ImGui::DockBuilderSplitNode(dockspaceId, ImGuiDir_Left, 0.18f, nullptr, &dockspaceId);
     ImGuiID screenNode = ImGui::DockBuilderSplitNode(dockspaceId, ImGuiDir_Left, 0.5f, nullptr, &dockspaceId);
+    ImGuiID playbackNode = ImGui::DockBuilderSplitNode(dockspaceId, ImGuiDir_Down, 0.25f, nullptr, &dockspaceId);
 
     ImGui::DockBuilderDockWindow(InputsComponent::WindowName().c_str(), inputNode);
     ImGui::DockBuilderDockWindow(ScreenPeekSubComponent::WindowName().c_str(), screenNode);
     ImGui::DockBuilderDockWindow(VideoComponent::WindowName().c_str(), dockspaceId);
+    ImGui::DockBuilderDockWindow(PlaybackComponent::WindowName().c_str(), playbackNode);
 
     ImGui::DockBuilderFinish(dockspaceId);
 }
@@ -1343,13 +1345,17 @@ void VideoComponent::OnFrame() {
 
 PlaybackComponent::PlaybackComponent(rgmui::EventQueue* queue)
     : m_EventQueue(queue)
+    , m_PlaybackSpeed(1.0f)
+    , m_IsPlaying(false)
+    , m_LastTime(util::Now())
+    , m_Accumulator(util::mclock::duration(0))
 {
 }
 
 PlaybackComponent::~PlaybackComponent() {
 }
 
-void PlaybackComponent::OnFrame() {
+void PlaybackComponent::HandleHotkeys() {
     auto& io = ImGui::GetIO();
     int dx = 0;
     if (!io.WantCaptureKeyboard) {
@@ -1377,7 +1383,72 @@ void PlaybackComponent::OnFrame() {
         if (dx) {
             m_EventQueue->PublishI(EventType::SCROLL_INPUT_TARGET, dx);
         }
+
+        if (ImGui::IsKeyPressed(SDL_SCANCODE_SPACE, false)) {
+            TogglePlaying();
+        }
     }
+}
+
+std::string PlaybackComponent::WindowName() {
+    return "Playback";
+}
+
+void PlaybackComponent::TogglePlaying() {
+    m_IsPlaying = !m_IsPlaying;
+    if (!m_IsPlaying) {
+        m_Accumulator = util::mclock::duration(0);
+    }
+}
+
+void PlaybackComponent::HandlePlaying() {
+    util::mclock::time_point v = util::Now();
+    if (m_IsPlaying && (m_PlaybackSpeed != 0.0f)) {
+        m_Accumulator += (v - m_LastTime);
+
+        float speed = std::pow(std::abs(m_PlaybackSpeed), 1.8);
+
+        int64_t frameDurationMillis = static_cast<int64_t>(
+                std::round(
+                    (static_cast<float>(nes::NTSC_FPS_DENOMINATOR) / static_cast<float>(nes::NTSC_FPS_NUMERATOR)) * 1000 / speed
+                    )
+                );
+        if (m_PlaybackSpeed < 0) {
+            frameDurationMillis *= -1;
+        }
+
+        if (frameDurationMillis != 0) {
+            int64_t accumMillis = util::ToMillis(m_Accumulator);
+            int d = accumMillis / frameDurationMillis;
+
+            m_Accumulator -= util::ToDuration(frameDurationMillis * d);
+            if (d != 0) {
+                m_EventQueue->PublishI(EventType::SCROLL_INPUT_TARGET, d);
+            }
+        }
+
+
+    }
+    m_LastTime = v;
+}
+
+void PlaybackComponent::OnFrame() {
+    HandleHotkeys();
+    HandlePlaying();
+
+    if (ImGui::Begin(WindowName().c_str())) {
+        std::string txt = (m_IsPlaying) ? "Pause" : "Play";
+        if (ImGui::Button(txt.c_str())) {
+            TogglePlaying();
+        }
+
+        ImGui::SliderFloat("Speed", &m_PlaybackSpeed, -7.0f, 7.0f);
+        ImGui::SameLine();
+        if (ImGui::Button("Reset")) {
+            m_PlaybackSpeed = 1.0f;
+        }
+    }
+    ImGui::End();
 }
 
 ////////////////////////////////////////////////////////////////////////////////
