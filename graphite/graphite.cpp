@@ -97,14 +97,21 @@ void GraphiteApp::SetupDockSpace() {
 
     ImGuiID inputNode = ImGui::DockBuilderSplitNode(dockspaceId, ImGuiDir_Left, 0.18f, nullptr, &dockspaceId);
     ImGuiID screenNode = ImGui::DockBuilderSplitNode(dockspaceId, ImGuiDir_Left, 0.5f, nullptr, &dockspaceId);
-    ImGuiID playbackNode = ImGui::DockBuilderSplitNode(dockspaceId, ImGuiDir_Down, 0.25f, nullptr, &dockspaceId);
+    ImGuiID playbackNode = ImGui::DockBuilderSplitNode(dockspaceId, ImGuiDir_Down, 0.245f, nullptr, &dockspaceId);
+    ImGuiID emuNode = ImGui::DockBuilderSplitNode(screenNode, ImGuiDir_Down, 0.25f, nullptr, &screenNode);
+
+    //ImGui::DockBuilderSetNodeSize(playbackNode, {-1, 0.25f * viewport->Size.y});
+    //ImGui::DockBuilderSetNodeSize(emuNode, {-1, 0.25f * viewport->Size.y});
+
 
     ImGui::DockBuilderDockWindow(InputsComponent::WindowName().c_str(), inputNode);
     ImGui::DockBuilderDockWindow(ScreenPeekSubComponent::WindowName().c_str(), screenNode);
     ImGui::DockBuilderDockWindow(VideoComponent::WindowName().c_str(), dockspaceId);
     ImGui::DockBuilderDockWindow(PlaybackComponent::WindowName().c_str(), playbackNode);
+    ImGui::DockBuilderDockWindow(RAMWatchSubComponent::WindowName().c_str(), emuNode);
 
     ImGui::DockBuilderFinish(dockspaceId);
+
 }
 
 bool GraphiteApp::OnFrame() {
@@ -917,6 +924,7 @@ IEmuPeekSubComponent::~IEmuPeekSubComponent() {
 EmuViewConfig EmuViewConfig::Defaults() {
     EmuViewConfig cfg;
     cfg.ScreenPeekCfg = ScreenPeekConfig::Defaults();
+    cfg.RAMWatchCfg = RAMWatchConfig::SMBDefaults(); // TODO?
     cfg.StateSequenceThreadCfg = nes::StateSequenceThreadConfig::Defaults();
     return cfg;
 }
@@ -928,6 +936,7 @@ EmuViewComponent::EmuViewComponent(rgmui::EventQueue* queue,
     , m_Emulator(std::move(emu))
 {
     RegisterEmuPeekComponent(std::make_shared<ScreenPeekSubComponent>(queue, &config->ScreenPeekCfg));
+    RegisterEmuPeekComponent(std::make_shared<RAMWatchSubComponent>(queue, &config->RAMWatchCfg));
 
     m_EventQueue->SubscribeS(NES_STATE_SET_TO, [&](const std::string& state){
         if (state.empty()) {
@@ -1112,6 +1121,73 @@ void ScreenPeekSubComponent::DoHoverTooltip(int x, int y, uint8_t pixel) {
     ImGui::TextUnformatted(PixelText(pixel).c_str());
     ImGui::EndTooltip();
 }
+
+////////////////////////////////////////////////////////////////////////////////
+
+RAMWatchConfig RAMWatchConfig::Defaults() {
+    RAMWatchConfig cfg;
+    return cfg;
+}
+
+RAMWatchConfig RAMWatchConfig::SMBDefaults() {
+    RAMWatchConfig cfg;
+    cfg.Lines.emplace_back(false, "X-Speed", 0x0057);
+    cfg.Lines.emplace_back(false, "X-SubSpeed", 0x0705);
+    cfg.Lines.emplace_back(false, "X-Pixel", 0x0086);
+    cfg.Lines.emplace_back(false, "X-Subpixel", 0x0400);
+    cfg.Lines.emplace_back(true, "", 0x0000);
+    cfg.Lines.emplace_back(false, "Y-Speed", 0x009f);
+    cfg.Lines.emplace_back(false, "Y-SubSpeed", 0x0433);
+    cfg.Lines.emplace_back(false, "Y-Pixel", 0x00ce);
+    cfg.Lines.emplace_back(false, "Y-Subpixel", 0x0416);
+    cfg.Lines.emplace_back(true, "", 0x0000);
+    cfg.Lines.emplace_back(false, "Player state", 0x000e);
+    cfg.Lines.emplace_back(false, "Airborne state", 0x001d);
+    return cfg;
+}
+
+RAMWatchLine::RAMWatchLine(bool isSep, std::string name, uint16_t addr)
+    : IsSeparator(isSep)
+    , Name(name)
+    , Address(addr)
+{
+}
+
+RAMWatchSubComponent::RAMWatchSubComponent(rgmui::EventQueue* queue, RAMWatchConfig* config)
+    : m_EventQueue(queue)
+    , m_Config(config)
+{
+}
+
+RAMWatchSubComponent::~RAMWatchSubComponent() {
+}
+
+void RAMWatchSubComponent::CacheNewEmulatorData(nes::INESEmulator* emu) {
+    if (emu) {
+        emu->CPUPeekRam(&m_RAM);
+    } else {
+        m_RAM.fill(0);
+    }
+}
+
+std::string RAMWatchSubComponent::WindowName() {
+    return "RAM Watch";
+}
+
+void RAMWatchSubComponent::OnFrame() {
+    if (ImGui::Begin(WindowName().c_str())) {
+        for (auto & line : m_Config->Lines) {
+            if (line.IsSeparator) {
+                ImGui::Separator();
+            } else {
+                ImGui::TextUnformatted(
+                    fmt::format("{:04x} {:>16} : {:3d} {:02x}", line.Address, line.Name, m_RAM[line.Address], m_RAM[line.Address]).c_str());
+            }
+        }
+    }
+    ImGui::End();
+}
+    
 
 ////////////////////////////////////////////////////////////////////////////////
 

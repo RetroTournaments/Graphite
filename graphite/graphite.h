@@ -280,10 +280,43 @@ private:
     cv::Mat m_Image;
 };
 
+struct RAMWatchLine {
+    RAMWatchLine(bool isSep, std::string name, uint16_t addr);
+
+    bool IsSeparator;
+    std::string Name;
+    uint16_t Address;
+};
+
+
+struct RAMWatchConfig {
+    std::vector<RAMWatchLine> Lines;
+
+    static RAMWatchConfig Defaults();
+    static RAMWatchConfig SMBDefaults();
+};
+
+class RAMWatchSubComponent : public IEmuPeekSubComponent {
+public: 
+    RAMWatchSubComponent(rgmui::EventQueue* queue, RAMWatchConfig* config);
+    virtual ~RAMWatchSubComponent();
+
+    virtual void CacheNewEmulatorData(nes::INESEmulator* emu) override;
+    virtual void OnFrame() override;
+
+    static std::string WindowName();
+
+private:
+    rgmui::EventQueue* m_EventQueue;
+    RAMWatchConfig* m_Config;
+    nes::Ram m_RAM;
+};
+
 
 
 struct EmuViewConfig {
     ScreenPeekConfig ScreenPeekCfg;
+    RAMWatchConfig RAMWatchCfg;
     nes::StateSequenceThreadConfig StateSequenceThreadCfg;
 
     static EmuViewConfig Defaults();
