@@ -56,7 +56,8 @@ enum EventType : int {
     OFFSET_SET_TO, // int
     SET_OFFSET_TO, // int
 
-    REQUEST_SAVE
+    REQUEST_SAVE,
+    REFRESH_CONFIG,
 };
 
 struct EmuViewConfig;
@@ -331,7 +332,7 @@ private:
     void UpdateOffset(int dx);
 
     void SetVideoFrame(int videoIndex);
-
+    void SetImageFromInputFrame();
 
 private:
     rgmui::EventQueue* m_EventQueue;

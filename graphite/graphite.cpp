@@ -57,6 +57,11 @@ bool graphite::ParseArgumentsToConfig(int* argc, char*** argv, GraphiteConfig* c
         util::ArgReadString(argc, argv, &config->VideoPath);
         SetFM2PathFromVideoPath(config);
         return true;
+    } else if (*argc == 3) {
+        util::ArgReadString(argc, argv, &config->InesPath);
+        util::ArgReadString(argc, argv, &config->VideoPath);
+        util::ArgReadString(argc, argv, &config->FM2Path);
+        return true;
     }
     return false;
 }
@@ -124,6 +129,18 @@ bool GraphiteApp::DoMainMenuBar() {
             if (ImGui::MenuItem("Exit", "Ctrl+w")) {
                 ret = false;
             }
+            ImGui::EndMenu();
+        }
+
+        if (ImGui::BeginMenu("config")) {
+            int size = m_Config->VideoCfg.ScreenMultiplier;
+            ImGui::PushItemWidth(50);
+            if (ImGui::SliderInt("Screen Size", &size, 1, 5)) {
+                m_Config->VideoCfg.ScreenMultiplier = size;
+                m_Config->EmuViewCfg.ScreenPeekCfg.ScreenMultiplier = size;
+                m_EventQueue.Publish(EventType::REFRESH_CONFIG);
+            }
+            ImGui::PopItemWidth();
             ImGui::EndMenu();
         }
 
@@ -932,6 +949,9 @@ ScreenPeekSubComponent::ScreenPeekSubComponent(rgmui::EventQueue* queue,
     : m_EventQueue(queue)
     , m_Config(config)
 {
+    m_EventQueue->Subscribe(EventType::REFRESH_CONFIG, [&](){
+        ConstructImageFromFrame();
+    });
     SetBlankImage();
 }
 
@@ -1099,6 +1119,9 @@ VideoComponent::VideoComponent(rgmui::EventQueue* queue,
     m_EventQueue->SubscribeI(EventType::SET_OFFSET_TO, [&](int v){
         SetOffset(v);
     });
+    m_EventQueue->Subscribe(EventType::REFRESH_CONFIG, [&](){
+        SetImageFromInputFrame();
+    });
 
     {
         std::ifstream ifs(videoPath);
@@ -1186,17 +1209,24 @@ void VideoComponent::FindTargetFrame(int frameIndex) {
     SetVideoFrame(std::distance(m_PTS.begin(), it));
 }
 
+void VideoComponent::SetImageFromInputFrame() {
+    if (m_LiveInputFrame) {
+        m_Image = cv::Mat(
+                m_LiveInputFrame->Height,
+                m_LiveInputFrame->Width,
+                CV_8UC3,
+                m_LiveInputFrame->Buffer);
+        cv::resize(m_Image, m_Image, {}, m_Config->ScreenMultiplier, m_Config->ScreenMultiplier,
+                cv::INTER_NEAREST);
+    } else {
+        SetBlankImage();
+    }
+}
+
 void VideoComponent::SetVideoFrame(int videoIndex) {
     m_CurrentVideoIndex = videoIndex;
     m_LiveInputFrame = m_VideoThread->GetFrame(m_CurrentVideoIndex);
-    assert(m_LiveInputFrame);
-    m_Image = cv::Mat(
-            m_LiveInputFrame->Height,
-            m_LiveInputFrame->Width,
-            CV_8UC3,
-            m_LiveInputFrame->Buffer);
-    cv::resize(m_Image, m_Image, {}, m_Config->ScreenMultiplier, m_Config->ScreenMultiplier,
-            cv::INTER_NEAREST);
+    SetImageFromInputFrame();
 }
 
 void VideoComponent::SetBlankImage() {
