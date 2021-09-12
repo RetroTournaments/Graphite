@@ -1338,6 +1338,10 @@ void PlaybackComponent::OnFrame() {
             dx = -1;
         } else if (ImGui::IsKeyPressed(SDL_SCANCODE_RIGHT)) {
             dx =  1;
+        } else if (ImGui::IsKeyPressed(SDL_SCANCODE_BACKSPACE)) {
+            dx = -1;
+        } else if (ImGui::IsKeyPressed(SDL_SCANCODE_BACKSLASH)) {
+            dx =  1;
         } else if (ImGui::IsKeyPressed(SDL_SCANCODE_UP)) {
             dx = -8;
         } else if (ImGui::IsKeyPressed(SDL_SCANCODE_DOWN)) {
