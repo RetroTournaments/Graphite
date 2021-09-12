@@ -477,6 +477,8 @@ void InputsComponent::DoInputLine(int frameIndex) {
         !m_Drag.IsDragging && 
         ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
 
+        m_TargetScroller.SuspendAutoScroll();
+
         if (!m_TargetDragging) {
             if (frameIndex == m_TargetIndex) {
                 m_CouldToggleLock = true;
@@ -786,6 +788,10 @@ float InputsComponent::TargetScroller::TargetY(int target) {
 void InputsComponent::TargetScroller::SetScrollDirectTo(int target) {
     m_TargetScrollY = TargetY(target);
     m_LastScrollTarget = target;
+}
+
+void InputsComponent::TargetScroller::SuspendAutoScroll() {
+    m_AutoScroll = false;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

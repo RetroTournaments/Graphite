@@ -155,6 +155,8 @@ private:
         void DoButtons();
         void UpdateScroll();
 
+        void SuspendAutoScroll();
+
     private:
         void SetScrollDirectTo(int target);
         float TargetY(int target);
