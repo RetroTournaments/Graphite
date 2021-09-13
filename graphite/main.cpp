@@ -44,42 +44,51 @@ static void InitializeDefaultLogger() {
 }
 
 int main(int argc, char** argv) {
-    InitializeDefaultLogger();
-    spdlog::info("program started");
-
     util::ArgNext(&argc, &argv); // Skip path argument
-    GraphiteConfig config = GraphiteConfig::Defaults();
-    // TODO load config / window size / ImGui::IniSettings from a file
 
-    rgmui::Window window(1920, 1080, "Graphite");
-    spdlog::info("window created");
-    ImGuiIO& io = ImGui::GetIO();
-    io.IniFilename = NULL; 
+    int ret = 0;
+    try {
+        InitializeDefaultLogger();
+        spdlog::info("program started");
 
-    bool wasExited = false;
-    if (!ParseArgumentsToConfig(&argc, &argv, &config)) {
-        spdlog::warn("did not parse command line arguments");
+        GraphiteConfig config = GraphiteConfig::Defaults();
+        // TODO load config / window size / ImGui::IniSettings from a file
 
-        GraphiteConfigApp cfgApp(&wasExited, &config);
-        rgmui::WindowAppMainLoop(&window, &cfgApp, std::chrono::microseconds(10000));
-    }
+        rgmui::Window window(1920, 1080, "Graphite");
+        spdlog::info("window created");
+        ImGuiIO& io = ImGui::GetIO();
+        io.IniFilename = NULL; 
 
-    if (!wasExited) {
-        spdlog::info("config completed");
-        spdlog::info("ines path: {}", config.InesPath);
-        spdlog::info("video path: {}", config.VideoPath);
-        spdlog::info("fm2 path: {}", config.FM2Path);
+        bool wasExited = false;
+        if (!ParseArgumentsToConfig(&argc, &argv, &config)) {
+            spdlog::warn("did not parse command line arguments");
 
-        try {
+            GraphiteConfigApp cfgApp(&wasExited, &config);
+            rgmui::WindowAppMainLoop(&window, &cfgApp, std::chrono::microseconds(10000));
+        }
+
+        if (!wasExited) {
+            spdlog::info("config completed");
+            spdlog::info("ines path: {}", config.InesPath);
+            spdlog::info("video path: {}", config.VideoPath);
+            spdlog::info("fm2 path: {}", config.FM2Path);
+
             GraphiteApp app(&config);
             spdlog::info("main loop initiated");
             rgmui::WindowAppMainLoop(&window, &app, std::chrono::microseconds(10000));
-        } catch(const std::exception& e) {
-            spdlog::error("exception: '{}'", e.what());
         }
+    } catch(const std::exception& e) {
+        std::string error = fmt::format("uncaught exception: '{}'", e.what());
+
+        spdlog::error(error);
+        std::cerr << error << std::endl;
+#ifdef _WIN32
+        MessageBox(NULL, error.c_str(), NULL, 0x00000030L);
+#endif
+        ret = 1;
     }
     spdlog::info("program ended");
-    return 0;
+    return ret;
 }
 
 #ifdef _WIN32

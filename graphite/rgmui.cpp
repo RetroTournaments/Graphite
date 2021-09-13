@@ -101,8 +101,12 @@ Window::Window(int winsizex, int winsizey, const std::string& name)
 
     ImGui::CreateContext();
     ImGui::StyleColorsDark();
-    ImGui_ImplSDL2_InitForOpenGL(m_Window, m_Context);
-    ImGui_ImplOpenGL3_Init("#version 330");
+    if (!ImGui_ImplSDL2_InitForOpenGL(m_Window, m_Context)) {
+        throw std::runtime_error("Failure initializing sdl for opengl, maybe update your graphics driver?");
+    }
+    if (!ImGui_ImplOpenGL3_Init("#version 330")) {
+        throw std::runtime_error("Failure initializing opengl, maybe update your graphics driver?");
+    }
 
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
