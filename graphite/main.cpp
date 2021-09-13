@@ -31,9 +31,10 @@
 #include "spdlog/sinks/basic_file_sink.h"
 
 #include "graphite/graphite.h"
-#include "graphite/rgmui.h"
+#include "rgmui/rgmui.h"
 
 using namespace graphite;
+using namespace rgms;
 
 static void InitializeDefaultLogger() {
     auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();

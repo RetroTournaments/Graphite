@@ -32,8 +32,8 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-#ifndef GRAPHITE_RGMUI_HEADER
-#define GRAPHITE_RGMUI_HEADER
+#ifndef RGMS_RGMUI_HEADER
+#define RGMS_RGMUI_HEADER
 
 #include <thread>
 #include <vector>
@@ -44,10 +44,10 @@
 #include "imgui.h"
 #include "opencv2/opencv.hpp"
 
-#include "graphite/util.h"
+#include "rgmutil/util.h"
 
 
-namespace graphite::rgmui {
+namespace rgms::rgmui {
 
 class Window;
 class IApplication;

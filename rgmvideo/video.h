@@ -20,8 +20,8 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-#ifndef GRAPHITE_VIDEO_HEADER
-#define GRAPHITE_VIDEO_HEADER
+#ifndef RGMS_VIDEO_HEADER
+#define RGMS_VIDEO_HEADER
 
 #include <cstdint>
 #include <string>
@@ -36,9 +36,9 @@
 
 #include "opencv2/opencv.hpp"
 
-#include "graphite/util.h"
+#include "rgmutil/util.h"
 
-namespace graphite::video {
+namespace rgms::video {
 
 enum class LiveGetResult {
     AGAIN,

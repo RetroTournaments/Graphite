@@ -27,9 +27,9 @@
 
 #include "fmt/core.h"
 
-#include "graphite/video.h"
+#include "rgmvideo/video.h"
 
-using namespace graphite::video;
+using namespace rgms::video;
 
 
 ILiveInput::ILiveInput() {
@@ -42,7 +42,7 @@ int ILiveInput::BufferSize() const {
     return Width() * Height() * 3;
 }
 
-std::string graphite::video::ToString(const LiveGetResult& res) {
+std::string rgms::video::ToString(const LiveGetResult& res) {
     if (res == LiveGetResult::AGAIN) {
         return "LiveGetResult::AGAIN";
     } else if (res == LiveGetResult::SUCCESS) {

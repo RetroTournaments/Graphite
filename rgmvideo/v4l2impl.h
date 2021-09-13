@@ -20,15 +20,15 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-#ifndef GRAPHITE_V4L2IMPL_HEADER
-#define GRAPHITE_V4L2IMPL_HEADER
+#ifndef RGMS_V4L2IMPL_HEADER
+#define RGMS_V4L2IMPL_HEADER
 
 #include "libv4l2.h"
 #include "linux/videodev2.h"
 
-#include "graphite/video.h"
+#include "rgmvideo/video.h"
 
-namespace graphite::video {
+namespace rgms::video {
 
 class V4L2LiveInput : public ILiveInput {
 public:

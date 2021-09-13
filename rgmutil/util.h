@@ -23,12 +23,12 @@
 // Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 //
 ////////////////////////////////////////////////////////////////////////////////
-#ifndef GRAPHITE_UTIL_HEADER
-#define GRAPHITE_UTIL_HEADER
+#ifndef RGMS_RGMUTIL_HEADER
+#define RGMS_RGMUTIL_HEADER
 
 #include <chrono>
 
-namespace graphite::util {
+namespace rgms::util {
 
 ////////////////////////////////////////////////////////////////////////////////
 // Arguments

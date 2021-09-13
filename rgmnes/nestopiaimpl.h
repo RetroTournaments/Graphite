@@ -28,8 +28,8 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-#ifndef GRAPHITE_NESTOPIAIMPL_HEADER
-#define GRAPHITE_NESTOPIAIMPL_HEADER
+#ifndef RGMS_NESTOPIAIMPL_HEADER
+#define RGMS_NESTOPIAIMPL_HEADER
 
 #include "NstApiEmulator.hpp"
 #include "NstApiMachine.hpp"
@@ -38,9 +38,9 @@
 #include "NstApiCartridge.hpp"
 #include "NstMachine.hpp"
 
-#include "graphite/nes.h"
+#include "rgmnes/nes.h"
 
-namespace graphite::nes {
+namespace rgms::nes {
 
 std::string ResultToString(Nes::Result r);
 

@@ -20,8 +20,8 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-#ifndef GRAPHITE_LIBAVIMPL_HEADER
-#define GRAPHITE_LIBAVIMPL_HEADER
+#ifndef RGMS_LIBAVIMPL_HEADER
+#define RGMS_LIBAVIMPL_HEADER
 
 extern "C" {
 #include "libavcodec/avcodec.h"
@@ -33,9 +33,9 @@ extern "C" {
 #include "libavutil/opt.h"
 }
 
-#include "graphite/video.h"
+#include "rgmvideo/video.h"
 
-namespace graphite::video {
+namespace rgms::video {
 
 std::string AVStringError(int retcode);
 

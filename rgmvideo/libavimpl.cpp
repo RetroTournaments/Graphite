@@ -25,11 +25,11 @@
 
 #include "fmt/core.h"
 
-#include "graphite/libavimpl.h"
+#include "rgmvideo/libavimpl.h"
 
-using namespace graphite::video;
+using namespace rgms::video;
 
-std::string graphite::video::AVStringError(int retcode) {
+std::string rgms::video::AVStringError(int retcode) {
     char errbuf[1024] = { 0 };
     av_strerror(retcode, errbuf, 1024);
     std::string err(errbuf);

@@ -20,38 +20,14 @@
 ##
 ################################################################################
 cmake_minimum_required(VERSION 3.6)
-project(graphite)
+project(rgmutil)
 
 ################################################################################
-# Graphite Lib
-#   - The library with all the components and such that make graphite a thing
+# Util Lib
+#   - That unfortunate library in c++ projects that contains a wide variety of
+#     shared utilities related to time / strings / memory and that nonsense
 ################################################################################
-add_library(graphitelib
-    graphite.cpp
-)
-target_link_libraries(graphitelib
-    rgmneslib rgmuilib rgmvideolib spdlog::spdlog
-)
-if (UNIX)
-    target_link_libraries(grapitelib
-        rgmvideolibextra stdc++fs
-    )
-endif()
-
-################################################################################
-# Graphite
-#   - The actual executable
-################################################################################
-if (UNIX)
-    add_executable(graphite
-        main.cpp
-    )
-else()
-    add_executable(graphite WIN32
-        main.cpp
-    )
-endif()
-target_link_libraries(graphite
-    graphitelib
+add_library(rgmutillib
+    util.cpp
 )
 

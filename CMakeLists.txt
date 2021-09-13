@@ -39,5 +39,11 @@ endif()
 
 add_subdirectory(3rd)
 include_directories(.)
+
+add_subdirectory(rgmutil)
+add_subdirectory(rgmui)
+add_subdirectory(rgmnes)
+add_subdirectory(rgmvideo)
+
 add_subdirectory(graphite)
 

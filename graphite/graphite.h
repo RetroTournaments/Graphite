@@ -31,17 +31,17 @@
 #include <string>
 #include <unordered_set>
 
-#include "graphite/rgmui.h"
-#include "graphite/nes.h"
-#include "graphite/video.h"
+#include "rgmui/rgmui.h"
+#include "rgmnes/nes.h"
+#include "rgmvideo/video.h"
 
 namespace graphite {
 
 struct InputChangeEvent {
-    InputChangeEvent(int frameIndex, nes::ControllerState newState);
+    InputChangeEvent(int frameIndex, rgms::nes::ControllerState newState);
 
     int FrameIndex;
-    nes::ControllerState NewState;
+    rgms::nes::ControllerState NewState;
 };
 
 enum EventType : int {
@@ -61,9 +61,9 @@ enum EventType : int {
 };
 
 struct EmuViewConfig;
-class NESEmulatorComponent : public rgmui::IApplicationComponent {
+class NESEmulatorComponent : public rgms::rgmui::IApplicationComponent {
 public:
-    NESEmulatorComponent(rgmui::EventQueue* queue, 
+    NESEmulatorComponent(rgms::rgmui::EventQueue* queue, 
             const std::string& inesPath,
             EmuViewConfig* emuViewConfig);
     ~NESEmulatorComponent();
@@ -71,13 +71,13 @@ public:
     virtual void OnFrame() override;
 
 private:
-    static nes::NESEmulatorFactorySPtr InitializeEmulatorFactory(const std::string& inesPath);
+    static rgms::nes::NESEmulatorFactorySPtr InitializeEmulatorFactory(const std::string& inesPath);
 
 private:
-    rgmui::EventQueue* m_EventQueue;
+    rgms::rgmui::EventQueue* m_EventQueue;
 
-    nes::NESEmulatorFactorySPtr m_EmulatorFactory;
-    nes::StateSequenceThread m_StateSequenceThread;
+    rgms::nes::NESEmulatorFactorySPtr m_EmulatorFactory;
+    rgms::nes::StateSequenceThread m_StateSequenceThread;
 };
 
 struct InputsConfig {
@@ -100,12 +100,12 @@ struct InputsConfig {
 
 class UndoRedo {
 public:
-    UndoRedo(rgmui::EventQueue* queue,
-             std::vector<nes::ControllerState>* inputs);
+    UndoRedo(rgms::rgmui::EventQueue* queue,
+             std::vector<rgms::nes::ControllerState>* inputs);
     ~UndoRedo();
 
     // Undo / redoable action
-    void ChangeInputTo(int frameIndex, nes::ControllerState newState);
+    void ChangeInputTo(int frameIndex, rgms::nes::ControllerState newState);
 
     void Undo();
     void Redo();
@@ -113,31 +113,31 @@ public:
     void ConsolidateLast(int count);
 
 private:
-    void IntChangeInput(int frameIndex, nes::ControllerState newState);
+    void IntChangeInput(int frameIndex, rgms::nes::ControllerState newState);
 
 private:
-    rgmui::EventQueue* m_EventQueue;
-    std::vector<nes::ControllerState>* m_Inputs;
+    rgms::rgmui::EventQueue* m_EventQueue;
+    std::vector<rgms::nes::ControllerState>* m_Inputs;
 
     int m_ChangeIndex;
     std::vector<size_t> m_ChangeIndices;
     struct Change {
         int FrameIndex;
-        nes::ControllerState OldState;
-        nes::ControllerState NewState;
+        rgms::nes::ControllerState OldState;
+        rgms::nes::ControllerState NewState;
         bool Consolidated;
 
-        Change(int _frameIndex, nes::ControllerState _oldState, nes::ControllerState _newState);
+        Change(int _frameIndex, rgms::nes::ControllerState _oldState, rgms::nes::ControllerState _newState);
         Change();
     };
     std::vector<Change> m_Changes;
 };
 
 inline const std::string FM2_OFFSET_COMMENT_LINE_START = "comment offset ";
-class InputsComponent : public rgmui::IApplicationComponent {
+class InputsComponent : public rgms::rgmui::IApplicationComponent {
 public:
     InputsComponent(
-            rgmui::EventQueue* queue,
+            rgms::rgmui::EventQueue* queue,
             const std::string& fm2Path,
             InputsConfig* config
             );
@@ -184,7 +184,7 @@ private:
     void DoInputList(ImVec2 screenPos, int startIndex, int endIndex);
     void DoMainMenuBar();
 
-    void ChangeInputTo(int frameIndex, nes::ControllerState newInput);
+    void ChangeInputTo(int frameIndex, rgms::nes::ControllerState newInput);
     void ChangeButtonTo(int frameIndex, uint8_t button, bool onoff);
     void ChangeTargetTo(int frameIndex, bool byChevronColumn);
     ImU32 TextColor(bool highlighted);
@@ -196,13 +196,13 @@ private:
     void TryReadFM2();
     void WriteFM2();
 
-    nes::FM2Header m_Header;
+    rgms::nes::FM2Header m_Header;
     std::string m_FM2Path;
     int m_OffsetMillis; 
 
 
 private:
-    rgmui::EventQueue* m_EventQueue;
+    rgms::rgmui::EventQueue* m_EventQueue;
     TargetScroller m_TargetScroller;
 
     ImVec2 m_LineSize;
@@ -229,33 +229,33 @@ private:
     InputsConfig* m_Config;
     UndoRedo m_UndoRedo;
 
-    std::vector<nes::ControllerState> m_Inputs;
+    std::vector<rgms::nes::ControllerState> m_Inputs;
     int m_TargetIndex;
     int m_CurrentIndex;
 };
 
-class IEmuPeekSubComponent : public rgmui::IApplicationComponent {
+class IEmuPeekSubComponent : public rgms::rgmui::IApplicationComponent {
 public:
     IEmuPeekSubComponent();
     virtual ~IEmuPeekSubComponent();
 
-    virtual void CacheNewEmulatorData(nes::INESEmulator* emu) = 0;
+    virtual void CacheNewEmulatorData(rgms::nes::INESEmulator* emu) = 0;
     virtual void OnFrame() = 0;
 };
 
 struct ScreenPeekConfig {
     int ScreenMultiplier;
-    nes::Palette NESPalette;
+    rgms::nes::Palette NESPalette;
 
     static ScreenPeekConfig Defaults();
 };
 
 class ScreenPeekSubComponent : public IEmuPeekSubComponent {
 public:
-    ScreenPeekSubComponent(rgmui::EventQueue* queue, ScreenPeekConfig* config);
+    ScreenPeekSubComponent(rgms::rgmui::EventQueue* queue, ScreenPeekConfig* config);
     virtual ~ScreenPeekSubComponent();
 
-    virtual void CacheNewEmulatorData(nes::INESEmulator* emu) override;
+    virtual void CacheNewEmulatorData(rgms::nes::INESEmulator* emu) override;
     virtual void OnFrame() override;
 
     static std::string WindowName();
@@ -273,10 +273,10 @@ private:
     void DoHoverTooltip(int x, int y, uint8_t pixel);
 
 private:
-    rgmui::EventQueue* m_EventQueue;
+    rgms::rgmui::EventQueue* m_EventQueue;
     ScreenPeekConfig* m_Config;
 
-    nes::Frame m_Frame;
+    rgms::nes::Frame m_Frame;
     cv::Mat m_Image;
 };
 
@@ -284,15 +284,15 @@ private:
 
 struct EmuViewConfig {
     ScreenPeekConfig ScreenPeekCfg;
-    nes::StateSequenceThreadConfig StateSequenceThreadCfg;
+    rgms::nes::StateSequenceThreadConfig StateSequenceThreadCfg;
 
     static EmuViewConfig Defaults();
 };
 
-class EmuViewComponent : public rgmui::IApplicationComponent {
+class EmuViewComponent : public rgms::rgmui::IApplicationComponent {
 public:
-    EmuViewComponent(rgmui::EventQueue* queue,
-            std::unique_ptr<nes::INESEmulator>&& emu,
+    EmuViewComponent(rgms::rgmui::EventQueue* queue,
+            std::unique_ptr<rgms::nes::INESEmulator>&& emu,
             EmuViewConfig* config);
     ~EmuViewComponent();
 
@@ -302,8 +302,8 @@ private:
     void RegisterEmuPeekComponent(std::shared_ptr<IEmuPeekSubComponent> comp);
 
 private:
-    rgmui::EventQueue* m_EventQueue;
-    std::unique_ptr<nes::INESEmulator> m_Emulator;
+    rgms::rgmui::EventQueue* m_EventQueue;
+    std::unique_ptr<rgms::nes::INESEmulator> m_Emulator;
 
     std::vector<std::shared_ptr<IEmuPeekSubComponent>> m_EmuComponents;
 };
@@ -316,9 +316,9 @@ struct VideoConfig {
     static VideoConfig Defaults();
 };
 
-class VideoComponent : public rgmui::IApplicationComponent {
+class VideoComponent : public rgms::rgmui::IApplicationComponent {
 public:
-    VideoComponent(rgmui::EventQueue* queue,
+    VideoComponent(rgms::rgmui::EventQueue* queue,
             const std::string& videoPath,
             VideoConfig* videoCfg);
     ~VideoComponent();
@@ -341,22 +341,22 @@ private:
     void SetImageFromInputFrame();
 
 private:
-    rgmui::EventQueue* m_EventQueue;
+    rgms::rgmui::EventQueue* m_EventQueue;
     VideoConfig* m_Config;
     std::string m_VideoPath;
-    std::unique_ptr<video::LiveInputThread> m_VideoThread;
+    std::unique_ptr<rgms::video::LiveInputThread> m_VideoThread;
 
     int64_t m_CurrentVideoIndex;
     int m_InputTarget;
 
     std::vector<int64_t> m_PTS;
-    video::LiveInputFramePtr m_LiveInputFrame;
+    rgms::video::LiveInputFramePtr m_LiveInputFrame;
     cv::Mat m_Image;
 };
 
-class PlaybackComponent : public rgmui::IApplicationComponent {
+class PlaybackComponent : public rgms::rgmui::IApplicationComponent {
 public:
-    PlaybackComponent(rgmui::EventQueue* queue);
+    PlaybackComponent(rgms::rgmui::EventQueue* queue);
     ~PlaybackComponent();
 
     virtual void OnFrame() override;
@@ -369,11 +369,11 @@ private:
     void TogglePlaying();
 
 private:
-    rgmui::EventQueue* m_EventQueue;
+    rgms::rgmui::EventQueue* m_EventQueue;
     float m_PlaybackSpeed;
     bool m_IsPlaying;
-    util::mclock::time_point m_LastTime;
-    util::mclock::duration m_Accumulator;
+    rgms::util::mclock::time_point m_LastTime;
+    rgms::util::mclock::duration m_Accumulator;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -394,7 +394,7 @@ struct GraphiteConfig {
 };
 bool ParseArgumentsToConfig(int* argc, char*** argv, GraphiteConfig* config);
 void SetFM2PathFromVideoPath(GraphiteConfig* config);
-class GraphiteConfigApp : public rgmui::IApplication {
+class GraphiteConfigApp : public rgms::rgmui::IApplication {
 public:
     GraphiteConfigApp(bool* wasExited, GraphiteConfig* config);
     ~GraphiteConfigApp();
@@ -403,7 +403,7 @@ public:
     virtual bool OnFrame() override;
 
 private:
-    static rgmui::IApplicationConfig ThisApplicationConfig();
+    static rgms::rgmui::IApplicationConfig ThisApplicationConfig();
     bool* m_WasExited;
     GraphiteConfig* m_Config;
 
@@ -414,7 +414,7 @@ private:
 ////////////////////////////////////////////////////////////////////////////////
 // Graphite App
 ////////////////////////////////////////////////////////////////////////////////
-class GraphiteApp : public rgmui::IApplication {
+class GraphiteApp : public rgms::rgmui::IApplication {
 public:
     GraphiteApp(GraphiteConfig* config);
     ~GraphiteApp();
@@ -428,7 +428,7 @@ private:
 private:
     bool m_FirstFrame;
     GraphiteConfig* m_Config;
-    rgmui::EventQueue m_EventQueue;
+    rgms::rgmui::EventQueue m_EventQueue;
 };
 
 }

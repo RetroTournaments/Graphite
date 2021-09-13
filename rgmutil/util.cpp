@@ -24,38 +24,38 @@
 #include <sstream>
 #include <iomanip>
 
-#include "graphite/util.h"
+#include "rgmutil/util.h"
 
-using namespace graphite::util;
+using namespace rgms::util;
 
-mclock::time_point graphite::util::Now() {
+mclock::time_point rgms::util::Now() {
     return mclock::now();
 }
 
-int64_t graphite::util::ElapsedMillisFrom(const mclock::time_point& from) {
+int64_t rgms::util::ElapsedMillisFrom(const mclock::time_point& from) {
     return ElapsedMillis(from, Now());
 }
 
-int64_t graphite::util::ToMillis(const mclock::duration& duration) {
+int64_t rgms::util::ToMillis(const mclock::duration& duration) {
     double sec = std::chrono::duration_cast<std::chrono::duration<double>>(duration).count();
     return static_cast<int64_t>(std::round(sec * 1000));
 }
 
-mclock::duration graphite::util::ToDuration(int64_t millis) {
+mclock::duration rgms::util::ToDuration(int64_t millis) {
     return std::chrono::milliseconds(millis);
 }
 
-int64_t graphite::util::ElapsedMillis(const mclock::time_point& from, const mclock::time_point& to) {
+int64_t rgms::util::ElapsedMillis(const mclock::time_point& from, const mclock::time_point& to) {
     return ToMillis(to - from);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
-std::string graphite::util::SimpleDurationFormat(const mclock::duration& duration, SimpleTimeFormatFlags flags) {
+std::string rgms::util::SimpleDurationFormat(const mclock::duration& duration, SimpleTimeFormatFlags flags) {
     return SimpleMillisFormat(ToMillis(duration), flags);
 }
 
-std::string graphite::util::SimpleMillisFormat(int64_t millis, SimpleTimeFormatFlags flags) {
+std::string rgms::util::SimpleMillisFormat(int64_t millis, SimpleTimeFormatFlags flags) {
     bool negative = millis < 0;
     millis = std::abs(millis);
 
@@ -134,24 +134,24 @@ std::string graphite::util::SimpleMillisFormat(int64_t millis, SimpleTimeFormatF
 
 ////////////////////////////////////////////////////////////////////////////////
 
-bool graphite::util::ArgPeekString(int* argc, char*** argv, std::string* str) {
+bool rgms::util::ArgPeekString(int* argc, char*** argv, std::string* str) {
     if (*argc <= 0) return false;
     *str = (*argv)[0];
     return true;
 }
 
-void graphite::util::ArgNext(int* argc, char*** argv) {
+void rgms::util::ArgNext(int* argc, char*** argv) {
     (*argc)--;
     (*argv)++;
 }
 
-bool graphite::util::ArgReadString(int* argc, char*** argv, std::string* str) {
+bool rgms::util::ArgReadString(int* argc, char*** argv, std::string* str) {
     if (!ArgPeekString(argc, argv, str)) return false;
     ArgNext(argc, argv);
     return true;
 }
 
-bool graphite::util::ArgReadInt(int* argc, char*** argv, int* v) {
+bool rgms::util::ArgReadInt(int* argc, char*** argv, int* v) {
     int64_t v64;
     if (ArgReadInt64(argc, argv, &v64)) {
         *v = static_cast<int>(v64);
@@ -160,7 +160,7 @@ bool graphite::util::ArgReadInt(int* argc, char*** argv, int* v) {
     return false;
 }
 
-bool graphite::util::ArgReadInt64(int* argc, char*** argv, int64_t* v) {
+bool rgms::util::ArgReadInt64(int* argc, char*** argv, int64_t* v) {
     std::string arg;
     if (!ArgReadString(argc, argv, &arg)) return false;
     std::istringstream is(arg);
@@ -173,7 +173,7 @@ bool graphite::util::ArgReadInt64(int* argc, char*** argv, int64_t* v) {
     return true;
 }
 
-bool graphite::util::ArgReadDouble(int* argc, char*** argv, double* v) {
+bool rgms::util::ArgReadDouble(int* argc, char*** argv, double* v) {
     std::string arg;
     if (!ArgReadString(argc, argv, &arg)) return false;
 

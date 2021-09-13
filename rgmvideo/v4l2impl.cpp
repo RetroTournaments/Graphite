@@ -28,9 +28,9 @@
 #include <sys/mman.h>
 #include <string.h>
 
-#include "graphite/v4l2impl.h"
+#include "rgmvideo/v4l2impl.h"
 
-using namespace graphite::video;
+using namespace rgms::video;
 
 ////////////////////////////////////////////////////////////////////////////////
 

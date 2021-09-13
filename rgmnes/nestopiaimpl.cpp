@@ -1,9 +1,5 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
-//
-//
-////////////////////////////////////////////////////////////////////////////////
-//
 // Copyright (C) 2021-2021 FlibidyDibidy
 //
 // This file is part of Graphite.
@@ -28,11 +24,11 @@
 #include <exception>
 #include <sstream>
 
-#include "graphite/nestopiaimpl.h"
+#include "rgmnes/nestopiaimpl.h"
 
-using namespace graphite::nes;
+using namespace rgms::nes;
 
-std::string graphite::nes::ResultToString(Nes::Result r) {
+std::string rgms::nes::ResultToString(Nes::Result r) {
     switch(r) {
         case Nes::Result::RESULT_ERR_WRONG_MODE:
             return "RESULT_ERR_WRONG_MODE (-13) [NTSC/PAL region mismatch.]";
