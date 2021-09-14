@@ -1154,8 +1154,8 @@ VideoComponent::VideoComponent(rgmui::EventQueue* queue,
         }
     }
 
-    m_VideoThread = std::make_unique<video::LiveInputThread>(
-                std::make_unique<video::OpenCVInput>(videoPath),
+    m_VideoThread = std::make_unique<video::LiveVideoThread>(
+                std::make_unique<video::CVVideoCaptureSource>(videoPath),
                 m_Config->MaxFrames, false);
 
     if (m_VideoThread->HasError()) {

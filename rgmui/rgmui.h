@@ -49,13 +49,6 @@
 
 namespace rgms::rgmui {
 
-class Window;
-class IApplication;
-
-void WindowAppMainLoop(
-    Window* window, IApplication* application,
-    util::mclock::duration minimumFrameDuration = util::mclock::duration(0));
-
 ////////////////////////////////////////////////////////////////////////////////
 
 class Window {

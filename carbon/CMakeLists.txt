@@ -20,37 +20,40 @@
 ##
 ################################################################################
 cmake_minimum_required(VERSION 3.6)
-project(rgmui)
+project(carbon)
 
 ################################################################################
-# RGMUI Lib
-#   - Library with useful utilities for creating my style of user interfaces
-#     with imgui, event queue communication, opencv integration, etc.
+# Carbon Lib
+#   - Components for resizing / morphing input videos into a consistent format
 ################################################################################
-add_library(rgmuilib
-    rgmui.cpp
-    rgmuimain.cpp
+add_library(carbonlib
+    carbon.cpp
 )
-target_include_directories(rgmuilib PUBLIC
-    ${Imgui_INCLUDE_DIRS}
-    ${SDL2_INCLUDE_DIRS}
-    ${fmt_INCLUDE_DIRS}
-    ${OpenCV_INCLUDE_DIRS}
-)
-target_link_libraries(rgmuilib
-    rgmutillib 3rdimgui 
-    SDL2 
-    ${OpenCV_LIBRARIES}
-    fmt::fmt
-    spdlog::spdlog
+target_link_libraries(carbonlib
+    rgmuilib rgmvideolib spdlog::spdlog
 )
 if (UNIX)
-    target_link_libraries(rgmuilib
-        pthread GL dl
-    )
-else()
-    target_link_libraries(rgmuilib
-        ${OPENGL_LIBRARIES}
+    target_link_libraries(grapitelib
+        rgmvideolibextra stdc++fs
     )
 endif()
+
+################################################################################
+# Carbon
+#   - The actual executable for helping define commands to resize videos to be
+#     256x240
+#   - Also used to apply the uncrt transform to a series of png files
+################################################################################
+if (UNIX)
+    add_executable(carbon
+        main.cpp
+    )
+else()
+    add_executable(carbon WIN32
+        main.cpp
+    )
+endif()
+target_link_libraries(carbon
+    carbonlib
+)
 

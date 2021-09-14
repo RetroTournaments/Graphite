@@ -46,4 +46,5 @@ add_subdirectory(rgmnes)
 add_subdirectory(rgmvideo)
 
 add_subdirectory(graphite)
+add_subdirectory(carbon)
 

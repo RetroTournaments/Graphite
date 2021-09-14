@@ -33,40 +33,6 @@
 
 using namespace rgms::rgmui;
 
-void rgms::rgmui::WindowAppMainLoop(
-        Window* window, IApplication* application,
-        util::mclock::duration minimumFrameDuration) {
-    SDL_Event e;
-    bool running = true;
-    while (running) {
-        while (SDL_PollEvent(&e) != 0) {
-            if (window) {
-                running &= window->OnSDLEvent(e);
-            }
-            if (application) {
-                running &= application->OnSDLEventExternal(e);
-            }
-        }
-
-        auto start = util::Now();
-        if (window) {
-            window->NewFrame();
-        }
-        if (application) {
-            running &= application->OnFrameExternal();
-        }
-        if (window) {
-            window->EndFrame();
-        }
-        auto end = util::Now();
-
-        auto elapsed = end - start;
-        if (elapsed < minimumFrameDuration) {
-            std::this_thread::sleep_for(minimumFrameDuration - elapsed);
-        }
-    }
-}
-
 ////////////////////////////////////////////////////////////////////////////////
 
 Window::Window(int winsizex, int winsizey, const std::string& name) 

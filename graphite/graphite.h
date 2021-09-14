@@ -344,7 +344,7 @@ private:
     rgms::rgmui::EventQueue* m_EventQueue;
     VideoConfig* m_Config;
     std::string m_VideoPath;
-    std::unique_ptr<rgms::video::LiveInputThread> m_VideoThread;
+    std::unique_ptr<rgms::video::LiveVideoThread> m_VideoThread;
 
     int64_t m_CurrentVideoIndex;
     int m_InputTarget;
