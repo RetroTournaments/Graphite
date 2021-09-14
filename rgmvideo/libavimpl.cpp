@@ -36,7 +36,7 @@ std::string rgms::video::AVStringError(int retcode) {
     return err;
 }
 
-LibAVLiveInput::LibAVLiveInput(const std::string& input)
+LibAVVideoSource::LibAVVideoSource(const std::string& input)
     : m_Input(input) 
     , m_AVFormatContext(nullptr)
     , m_AVCodecContext(nullptr)
@@ -49,7 +49,7 @@ LibAVLiveInput::LibAVLiveInput(const std::string& input)
     Open();
 }
 
-LibAVLiveInput::~LibAVLiveInput() {
+LibAVVideoSource::~LibAVVideoSource() {
     Close();
 }
 
@@ -57,14 +57,14 @@ static int InterruptCallback(void* opaque) {
     return 0;
 }
 
-void LibAVLiveInput::ReportError(const std::string& func, int retcode) {
+void LibAVVideoSource::ReportError(const std::string& func, int retcode) {
     std::ostringstream os;
     os <<  "[ERROR] in " << func << std::endl
        << "  " << AVStringError(retcode) << std::endl;
     m_LastError = os.str();
 }
 
-void LibAVLiveInput::Open() {
+void LibAVVideoSource::Open() {
     assert(m_AVFormatContext == nullptr);
     assert(m_AVCodecContext == nullptr);
     assert(m_SwsContext == nullptr);
@@ -136,7 +136,7 @@ void LibAVLiveInput::Open() {
             Width(), Height());
 }
 
-void LibAVLiveInput::Close() {
+void LibAVVideoSource::Close() {
     if (m_AVFormatContext) {
         avformat_close_input(&m_AVFormatContext);
         m_AVFormatContext = nullptr;
@@ -166,32 +166,32 @@ void LibAVLiveInput::Close() {
     m_InputIndex = -1;
 }
 
-int LibAVLiveInput::Width() const {
+int LibAVVideoSource::Width() const {
     if (m_AVCodecContext) {
         return m_AVCodecContext->width;
     }
     return 0;
 }
 
-int LibAVLiveInput::Height() const {
+int LibAVVideoSource::Height() const {
     if (m_AVCodecContext) {
         return m_AVCodecContext->height;
     }
     return 0;
 }
 
-LiveGetResult LibAVLiveInput::Get(uint8_t* buffer, int64_t* ptsMilliseconds) {
+GetResult LibAVVideoSource::Get(uint8_t* buffer, int64_t* ptsMilliseconds) {
     if (m_AVFormatContext == nullptr ||
         m_AVCodecContext == nullptr ||
         m_SwsContext == nullptr ||
         m_InputIndex < 0) {
         if (m_LastError == "") {
-            m_LastError = "[ERROR] in LibAVLiveInput::Get\n  Input is not open?";
+            m_LastError = "[ERROR] in LibAVVideoSource::Get\n  Input is not open?";
         }
-        return LiveGetResult::FAILURE;
+        return GetResult::FAILURE;
     }
     if (m_LastError != "") {
-        return LiveGetResult::FAILURE;
+        return GetResult::FAILURE;
     }
 
     AVPacket* packet = av_packet_alloc();
@@ -199,10 +199,10 @@ LiveGetResult LibAVLiveInput::Get(uint8_t* buffer, int64_t* ptsMilliseconds) {
 
     int gotFrame = 0;
     int ret = av_read_frame(m_AVFormatContext, packet);
-    if (ret == AVERROR(EAGAIN)) return LiveGetResult::AGAIN;
+    if (ret == AVERROR(EAGAIN)) return GetResult::AGAIN;
     if (ret != 0) {
         ReportError("av_read_frame", ret);
-        return LiveGetResult::FAILURE;
+        return GetResult::FAILURE;
     }
 
     if (packet->stream_index == m_InputIndex) {
@@ -224,22 +224,22 @@ LiveGetResult LibAVLiveInput::Get(uint8_t* buffer, int64_t* ptsMilliseconds) {
     av_packet_unref(packet);
 
     av_packet_free(&packet);
-    if (gotFrame) return LiveGetResult::SUCCESS;
-    return LiveGetResult::AGAIN;
+    if (gotFrame) return GetResult::SUCCESS;
+    return GetResult::AGAIN;
 }
-void LibAVLiveInput::Reopen() {
+void LibAVVideoSource::Reopen() {
     Close();
     Open();
 }
 
-void LibAVLiveInput::ClearError() {
+void LibAVVideoSource::ClearError() {
     m_LastError = "";
 }
-std::string LibAVLiveInput::LastError() {
+std::string LibAVVideoSource::LastError() {
     return m_LastError;
 }
 
-std::string LibAVLiveInput::Information() {
+std::string LibAVVideoSource::Information() {
     return m_Information;
 }
 

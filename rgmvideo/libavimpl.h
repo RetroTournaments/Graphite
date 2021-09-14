@@ -40,19 +40,19 @@ namespace rgms::video {
 std::string AVStringError(int retcode);
 
 
-class LibAVLiveInput : public ILiveInput {
+class LibAVVideoSource : public IVideoSource {
 public:
     // As: "https://blahblahblah.m3u8"
     // or: "http://127.0.0.1:34613/" (remember:
     //  streamlink --twitch-disable-ads --twitch-low-latency twitch.tv/blah 720p60 
     //      --player-external-http)
-    LibAVLiveInput(const std::string& input); 
-    ~LibAVLiveInput();
+    LibAVVideoSource(const std::string& input); 
+    ~LibAVVideoSource();
 
     int Width() const override final;
     int Height() const override final;
 
-    LiveGetResult Get(uint8_t* buffer, int64_t* ptsMilliseconds) override final;
+    GetResult Get(uint8_t* buffer, int64_t* ptsMilliseconds) override final;
     void Reopen() override final;
     void ClearError() override final;
     std::string LastError() override final;

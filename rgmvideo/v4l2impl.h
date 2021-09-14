@@ -30,16 +30,16 @@
 
 namespace rgms::video {
 
-class V4L2LiveInput : public ILiveInput {
+class V4L2VideoSource : public IVideoSource {
 public:
     // As: "/dev/videoX"
-    V4L2LiveInput(const std::string& input); 
-    ~V4L2LiveInput();
+    V4L2VideoSource(const std::string& input); 
+    ~V4L2VideoSource();
 
     int Width() const override final;
     int Height() const override final;
 
-    LiveGetResult Get(uint8_t* buffer, int64_t* ptsMilliseconds) override final;
+    GetResult Get(uint8_t* buffer, int64_t* ptsMilliseconds) override final;
     void Reopen() override final;
     void ClearError() override final;
     std::string LastError() override final;

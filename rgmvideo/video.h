@@ -40,37 +40,46 @@
 
 namespace rgms::video {
 
-enum class LiveGetResult {
+enum class GetResult {
     AGAIN,
     SUCCESS,
     FAILURE
 };
-std::string ToString(const LiveGetResult& res);
-inline std::ostream& operator<<(std::ostream& os, const LiveGetResult& res) {
+std::string ToString(const GetResult& res);
+inline std::ostream& operator<<(std::ostream& os, const GetResult& res) {
     os << ToString(res);
     return os;
 };
 
-class ILiveInput {
+enum class ErrorState {
+    NO_ERROR,
+    CAN_NOT_OPEN_SOURCE,
+    INPUT_EXHAUSTED,
+    OTHER_ERROR
+};
+
+class IVideoSource {
 public:
-    ILiveInput();
-    virtual ~ILiveInput();
+    IVideoSource();
+    virtual ~IVideoSource();
 
     virtual int Width() const = 0;
     virtual int Height() const = 0;
-    virtual int BufferSize() const;
+    virtual int BufferSize() const final;
 
-    // Supplied buffer will be preallocated width() * height() * 3 in size. 
-    // Will be filled in BGR order
-    // ptsMilliseconds is the ~timestamp of the frame in milliseconds
-    virtual LiveGetResult Get(uint8_t* buffer, int64_t* ptsMilliseconds) = 0;
+    // Supplied buffer must be BufferSize() 
+    // [width() * height() * 3] in size. 
+    // Must be filled in BGR order
+    // ptsMilliseconds must be the ~timestamp of the frame in milliseconds
+    virtual GetResult Get(uint8_t* buffer, int64_t* ptsMilliseconds) = 0;
 
     virtual void Reopen() = 0;
     virtual void ClearError() = 0;
-    virtual std::string LastError() = 0;
-    virtual std::string Information() = 0;
+    virtual ErrorState GetErrorState() = 0;
+    virtual std::string GetLastError() = 0;
+    virtual std::string GetInformation() = 0;
 };
-typedef std::unique_ptr<ILiveInput> ILiveInputPtr;
+typedef std::unique_ptr<IVideoSource> IVideoSourcePtr;
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -87,15 +96,15 @@ struct LiveInputFrame {
 };
 typedef std::shared_ptr<LiveInputFrame> LiveInputFramePtr;
 
-// A class that has its own thread that continuously reads from the live input.
-// Maintains some relevant (health) information.
-// Can reopen the input if necessary (I had a problem with twitch streams...)
-class LiveInputThread {
+// A class that has its own thread that continuously reads from the live video
+// source. Maintains some relevant (health) information.
+// Can reopen the source if necessary (I had a problem with twitch streams...)
+class LiveVideoThread {
 public:
-    LiveInputThread(ILiveInputPtr input, 
+    LiveVideoThread(IVideoSourcePtr input, 
             int queueSize,
             bool allowDiscard = true);
-    ~LiveInputThread();
+    ~LiveVideoThread();
 
     // The latest frame is always available (for things like display)
     // (Except when it isn't, then you'll get nullptr)
@@ -145,7 +154,6 @@ private:
     bool ShouldReset();
     void Reset();
 
-
 private:
     std::atomic<bool> m_ShouldStop;
     std::atomic<bool> m_ShouldReset;
@@ -171,23 +179,94 @@ private:
     std::deque<LiveInputFramePtr> m_Queue;
     LiveInputFramePtr m_LatestFrame;
 
-    ILiveInputPtr m_LiveInput;
+    IVideoSourcePtr m_LiveInput;
     std::thread m_WatchingThread;
+};
+
+// A class that has its own thread that tries to have frames available as
+// necessary
+struct StaticVideoBufferConfig {
+    int BufferSize; // in bytes, you should give quite a bit of space!!! (will round up!)
+    float ForwardBias; // defaults to 0.5, meaning say you have room for 100 frames and you just read frame #324, we will try to have 274 to 374 in the buffer.
+
+    static StaticVideoBufferConfig Defaults();
+};
+
+// This is a big pain because I don't want to rely on 'seeking' video files.
+// Note that this is not adequate for actual video editing or anything. It reads
+// from the beginning if you do too much 'rewinding'. :(
+class StaticVideoBuffer {
+public:
+    StaticVideoBuffer(IVideoSourcePtr source,
+            StaticVideoBufferConfig config = StaticVideoBufferConfig::Defaults()); 
+    ~StaticVideoBuffer();
+
+    bool HasError() const;
+    ErrorState GetErrorState() const;
+    std::string GetError() const;
+    std::string GetInputInformation() const;
+
+    int Width() const;
+    int Height() const;
+    int ImageDataBufferSize() const;
+    int64_t CurrentKnownNumFrames() const; // will change as the input is read.
+
+    bool HasFrame(int64_t frameIndex) const;
+
+    // Needs to do things like reopen the input, decode frames, or read additional frames
+    bool HasWork() const; 
+    void DoWork();
+
+    // ImageData is only valid until the next call to DoWork!!!
+    // If you want to keep it then copy it yourself. Watch out for
+    // GetResult::AGAIN, and GetResult::FAILURE
+    GetResult GetFrame(int64_t frameIndex, int64_t* pts, uint8_t** imageData) const;
+    
+private:
+    bool RecordIndex(int64_t frameIndex, const std::deque<Record>& records, 
+            size_t* recordIndex = nullptr);
+
+
+private:
+    StaticVideoBufferConfig m_Config;
+
+    IVideoSourcePtr m_Source;
+    int64_t m_SourceFrameIndex;
+
+    int64_t m_TargetFrameIndex;
+
+    struct Record {
+        int64_t FrameIndex;
+        int64_t PTS;
+        uint8_t* Data;
+    };
+
+    int64_t m_CurrentKnownNumFrames;
+    bool m_InputWasExhausted;
+
+    std::deque<Record> m_Records; // sequential by frame index
+    std::vector<uint8_t> m_Data; // Big and preallocated :O
+
+    // Only used if we are rewinding, which only occurs if a)
+    //  The data buffer has been completely filled, and we are seeking a target
+    //  frame index less than the lowest in records
+    // As we rewind we remove records from the end of m_Records and make new
+    // ones here, until we catch up at which point m_Records is back in business
+    std::deque<Record> m_RewindRecords; 
 };
 
 ////////////////////////////////////////////////////////////////////////////////
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-class OpenCVInput : public ILiveInput {
+class CVVideoCaptureSource : public IVideoSource {
 public:
-    OpenCVInput(const std::string& input); 
-    ~OpenCVInput();
+    CVVideoCaptureSource(const std::string& input); 
+    ~CVVideoCaptureSource();
 
     int Width() const override final;
     int Height() const override final;
-
-    LiveGetResult Get(uint8_t* buffer, int64_t* ptsMilliseconds) override final;
+    GetResult Get(uint8_t* buffer, int64_t* ptsMilliseconds) override final;
     void Reopen() override final;
     void ClearError() override final;
     std::string LastError() override final;

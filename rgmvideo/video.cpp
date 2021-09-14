@@ -32,23 +32,23 @@
 using namespace rgms::video;
 
 
-ILiveInput::ILiveInput() {
+IVideoSource::IVideoSource() {
 }
 
-ILiveInput::~ILiveInput() {
+IVideoSource::~IVideoSource() {
 }
 
-int ILiveInput::BufferSize() const {
+int IVideoSource::BufferSize() const {
     return Width() * Height() * 3;
 }
 
-std::string rgms::video::ToString(const LiveGetResult& res) {
-    if (res == LiveGetResult::AGAIN) {
-        return "LiveGetResult::AGAIN";
-    } else if (res == LiveGetResult::SUCCESS) {
-        return "LiveGetResult::SUCCESS";
+std::string rgms::video::ToString(const GetResult& res) {
+    if (res == GetResult::AGAIN) {
+        return "GetResult::AGAIN";
+    } else if (res == GetResult::SUCCESS) {
+        return "GetResult::SUCCESS";
     } else {
-        return "LiveGetResult::FAILURE";
+        return "GetResult::FAILURE";
     }
     return "";
 }
@@ -73,7 +73,7 @@ LiveInputFrame::~LiveInputFrame() {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-LiveInputThread::LiveInputThread(ILiveInputPtr input, int queueSize, bool allowDiscard)
+LiveVideoThread::LiveVideoThread(IVideoSourcePtr source, int queueSize, bool allowDiscard)
     : m_ShouldStop(false)
     , m_ShouldReset(false)
     , m_HasError(false)
@@ -87,22 +87,22 @@ LiveInputThread::LiveInputThread(ILiveInputPtr input, int queueSize, bool allowD
     , m_AllowDiscard(allowDiscard)
     , m_StartTime(util::mclock::now())
     , m_ResetTime(m_StartTime)
-    , m_InformationString(input->Information()) 
-    , m_LiveInput(std::move(input)) 
+    , m_InformationString(source->Information()) 
+    , m_LiveInput(std::move(source)) 
 {
     if (!m_LiveInput) {
-        throw std::runtime_error("no input");
+        throw std::runtime_error("no source");
     }
     m_WatchingThread = std::thread(
-            &LiveInputThread::WatchingThread, this);
+            &LiveVideoThread::WatchingThread, this);
 }
 
-LiveInputThread::~LiveInputThread() {
+LiveVideoThread::~LiveVideoThread() {
     m_ShouldStop = true;
     m_WatchingThread.join();
 }
 
-LiveInputFramePtr LiveInputThread::GetLatestFrame() const {
+LiveInputFramePtr LiveVideoThread::GetLatestFrame() const {
     LiveInputFramePtr f;
     {
         std::lock_guard<std::mutex> lock(m_SharedMutex);
@@ -111,7 +111,7 @@ LiveInputFramePtr LiveInputThread::GetLatestFrame() const {
     return f;
 }
 
-LiveInputFramePtr LiveInputThread::GetFrame(int index, int advance) {
+LiveInputFramePtr LiveVideoThread::GetFrame(int index, int advance) {
     if (index >= 0) {
         std::lock_guard<std::mutex> lock(m_SharedMutex);
         if (m_Queue.empty() || index >= m_Queue.size()) {
@@ -125,14 +125,14 @@ LiveInputFramePtr LiveInputThread::GetFrame(int index, int advance) {
 }
 
 
-void LiveInputThread::Advance(int amt) {
+void LiveVideoThread::Advance(int amt) {
     if (amt > 0) {
         std::lock_guard<std::mutex> lock(m_SharedMutex);
         AdvanceAlreadyLocked(amt);
     }
 }
 
-void LiveInputThread::AdvanceAlreadyLocked(int amt) {
+void LiveVideoThread::AdvanceAlreadyLocked(int amt) {
     if (amt > 0) {
         if (amt >= m_Queue.size()) {
             m_Queue.clear();
@@ -144,7 +144,7 @@ void LiveInputThread::AdvanceAlreadyLocked(int amt) {
 
 
 
-void LiveInputThread::ProcessReadFrame(LiveInputFramePtr p) {
+void LiveVideoThread::ProcessReadFrame(LiveInputFramePtr p) {
     p->FrameNumber = m_NumReadFrames;
     m_NumReadFrames++;
     m_NumReadFramesSinceLastReset++;
@@ -161,11 +161,11 @@ void LiveInputThread::ProcessReadFrame(LiveInputFramePtr p) {
     }
 }
 
-int64_t LiveInputThread::MillisecondsSinceLastFrame() const {
+int64_t LiveVideoThread::MillisecondsSinceLastFrame() const {
     return util::ElapsedMillisFrom(m_LastHit);
 }
 
-bool LiveInputThread::ShouldReset() {
+bool LiveVideoThread::ShouldReset() {
     // I honestly don't remember what I was doing here.
     if (m_ResetThreshold > 0 && MillisecondsSinceLastFrame() > m_ResetThreshold) {
         return util::ElapsedMillisFrom(m_ResetTime) > (m_ResetThreshold / 2);
@@ -173,7 +173,7 @@ bool LiveInputThread::ShouldReset() {
     return m_ShouldReset;
 }
 
-void LiveInputThread::WatchingThread() {
+void LiveVideoThread::WatchingThread() {
     auto AllocFrame = [&](){
         LiveInputFramePtr p = std::make_shared<LiveInputFrame>(
                 m_LiveInput->Width(), m_LiveInput->Height());
@@ -205,10 +205,10 @@ void LiveInputThread::WatchingThread() {
             }
         }
 
-        LiveGetResult res = m_LiveInput->Get(p->Buffer, &p->PtsMilliseconds);
-        if (res == LiveGetResult::AGAIN) {
+        GetResult res = m_LiveInput->Get(p->Buffer, &p->PtsMilliseconds);
+        if (res == GetResult::AGAIN) {
             std::this_thread::sleep_for(std::chrono::milliseconds(2));
-        } else if (res == LiveGetResult::SUCCESS) {
+        } else if (res == GetResult::SUCCESS) {
             ProcessReadFrame(p);
             p = AllocFrame();
         } else {
@@ -222,19 +222,19 @@ void LiveInputThread::WatchingThread() {
     }
 }
 
-void LiveInputThread::RequestReset() {
+void LiveVideoThread::RequestReset() {
     m_ShouldReset = true;
 }
 
-bool LiveInputThread::GetPaused() const {
+bool LiveVideoThread::GetPaused() const {
     return m_Paused;
 }
 
-void LiveInputThread::SetPaused(bool paused) {
+void LiveVideoThread::SetPaused(bool paused) {
     m_Paused = paused;
 }
 
-void LiveInputThread::Reset() {
+void LiveVideoThread::Reset() {
     m_LiveInput->ClearError();
     m_LiveInput->Reopen();
     {
@@ -250,103 +250,103 @@ void LiveInputThread::Reset() {
     m_NumDiscardedFramesSinceLastReset = 0;
 }
 
-bool LiveInputThread::HasError() const {
+bool LiveVideoThread::HasError() const {
     return m_HasError;
 }
 
-std::string LiveInputThread::GetError() const {
+std::string LiveVideoThread::GetError() const {
     return m_ErrorString;
 }
 
-std::string LiveInputThread::InputInformation() const {
+std::string LiveVideoThread::InputInformation() const {
     return m_InformationString;
 }
 
-int64_t LiveInputThread::NumReadFrames() const {
+int64_t LiveVideoThread::NumReadFrames() const {
     return m_NumReadFrames;
 }
 
-int64_t LiveInputThread::NumReadFramesSinceLastReset() const {
+int64_t LiveVideoThread::NumReadFramesSinceLastReset() const {
     return m_NumReadFramesSinceLastReset;
 }
 
-int64_t LiveInputThread::NumDiscardedFrames() const {
+int64_t LiveVideoThread::NumDiscardedFrames() const {
     return m_NumDiscardedFrames;
 }
 
-int64_t LiveInputThread::NumDiscardedFramesSinceLastReset() const {
+int64_t LiveVideoThread::NumDiscardedFramesSinceLastReset() const {
     return m_NumDiscardedFramesSinceLastReset;
 }
 
 
-int64_t LiveInputThread::OpenMilliseconds() const {
+int64_t LiveVideoThread::OpenMilliseconds() const {
     return util::ElapsedMillisFrom(m_StartTime);
 }
 
-int64_t LiveInputThread::OpenMillisecondsSinceLastReset() const {
+int64_t LiveVideoThread::OpenMillisecondsSinceLastReset() const {
     return util::ElapsedMillisFrom(m_ResetTime);
 }
 
-int64_t LiveInputThread::QueueSize() const {
+int64_t LiveVideoThread::QueueSize() const {
     std::lock_guard<std::mutex> lock(m_SharedMutex);
     return static_cast<int64_t>(m_Queue.size());
 }
 
-int64_t LiveInputThread::GetResetThresholdMilliseconds() const {
+int64_t LiveVideoThread::GetResetThresholdMilliseconds() const {
     return m_ResetThreshold;
 }
 
-void LiveInputThread::SetResetThresholdMilliseconds(int64_t resetThreshold) {
+void LiveVideoThread::SetResetThresholdMilliseconds(int64_t resetThreshold) {
     m_ResetThreshold = resetThreshold;
 }
 
-int64_t LiveInputThread::GetQueueCapacity() const {
+int64_t LiveVideoThread::GetQueueCapacity() const {
     return m_QueueCapacity;
 }
 
-void LiveInputThread::SetQueueCapacity(int64_t capacity) {
+void LiveVideoThread::SetQueueCapacity(int64_t capacity) {
     m_QueueCapacity = capacity;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
-OpenCVInput::OpenCVInput(const std::string& input)
+CVVideoCaptureSource::CVVideoCaptureSource(const std::string& input)
     : m_Input(input)
 {
     Reopen();
 }
 
-OpenCVInput::~OpenCVInput()
+CVVideoCaptureSource::~CVVideoCaptureSource()
 {
 }
 
-int OpenCVInput::Width() const {
+int CVVideoCaptureSource::Width() const {
     return m_Width;
 }
 
-int OpenCVInput::Height() const {
+int CVVideoCaptureSource::Height() const {
     return m_Height;
 }
 
 
-LiveGetResult OpenCVInput::Get(uint8_t* buffer, int64_t* ptsMilliseconds) {
+GetResult CVVideoCaptureSource::Get(uint8_t* buffer, int64_t* ptsMilliseconds) {
     if (!m_Error.empty()) {
-        return LiveGetResult::FAILURE;
+        return GetResult::FAILURE;
     }
 
     if (!m_OnFirstFrame) {
         if (!ReadNextFrame()) {
-            return LiveGetResult::FAILURE;
+            return GetResult::FAILURE;
         }
     }
 
     m_OnFirstFrame = false;
     std::memcpy(buffer, m_Frame.data, m_NumBytes);
     *ptsMilliseconds = static_cast<int64_t>(std::round(m_PTS));
-    return LiveGetResult::SUCCESS;
+    return GetResult::SUCCESS;
 }
 
-bool OpenCVInput::ReadNextFrame() {
+bool CVVideoCaptureSource::ReadNextFrame() {
     m_Capture->read(m_Frame);
     m_PTS = m_Capture->get(cv::CAP_PROP_POS_MSEC);
     if (m_Frame.empty()) {
@@ -356,7 +356,7 @@ bool OpenCVInput::ReadNextFrame() {
     return true;
 }
 
-void OpenCVInput::Reopen() {
+void CVVideoCaptureSource::Reopen() {
     ClearError();
     m_Capture = std::make_unique<cv::VideoCapture>(m_Input);
     if (!m_Capture->isOpened()) {
@@ -370,14 +370,137 @@ void OpenCVInput::Reopen() {
     m_NumBytes = m_Width * m_Height * 3;
 }
 
-void OpenCVInput::ClearError() {
+void CVVideoCaptureSource::ClearError() {
     m_Error = "";
 }
 
-std::string OpenCVInput::LastError() {
+std::string CVVideoCaptureSource::LastError() {
     return m_Error;
 }
 
-std::string OpenCVInput::Information() {
+std::string CVVideoCaptureSource::Information() {
     return m_Input;
 }
+
+////////////////////////////////////////////////////////////////////////////////
+
+StaticVideoBufferConfig StaticVideoBufferConfig::Defaults() {
+    StaticVideoBufferConfig cfg;
+    cfg.BufferSize = 1024 * 1024 * 1024;
+    cfg.ForwardBias = 0.5;
+    return cfg;
+}
+
+StaticVideoBuffer::StaticVideoBuffer(IVideoSourcePtr source,
+        StaticVideoBufferConfig config)
+    : m_Config(config)
+    , m_Source(std::move(source))
+    , m_SourceFrameIndex(0)
+    , m_TargetFrameIndex(0)
+    , m_InputWasExhausted(false)
+{
+    if (!m_Source) {
+        throw std::invalid_argument("must provide source");
+    }
+
+    int imSize = ImageDataBufferSize();
+    if (imSize > 0) {
+        int n = m_Config.BufferSize / imSize;
+        n += 1;
+        m_Data.resize(n * imSize);
+    }
+}
+
+StaticVideoBuffer::~StaticVideoBuffer() {
+}
+
+bool StaticVideoBuffer::HasError() const {
+    return GetErrorState() != ErrorState::NO_ERROR;
+}
+
+ErrorState StaticVideoBuffer::GetErrorState() const {
+    return m_Source->GetErrorState();
+}
+
+std::string StaticVideoBuffer::GetError() const {
+    return m_Source->GetLastError();
+}
+
+std::string StaticVideoBuffer::GetInputInformation() const {
+    return m_Source->GetInformation();
+}
+
+int StaticVideoBuffer::Width() const {
+    return m_Source->Width();
+}
+
+int StaticVideoBuffer::Height() const {
+    return m_Source->Height();
+}
+
+int StaticVideoBuffer::ImageDataBufferSize() const {
+    return m_Source->BufferSize();
+}
+
+int64_t StaticVideoBuffer::CurrentKnownNumFrames() const {
+    return m_CurrentKnownNumFrames;
+}
+
+bool StaticVideoBuffer::HasWork() const {
+    // TODO can we read more?
+    return false;
+}
+
+void StaticVideoBuffer::DoWork() {
+    // TODO read stuff etc
+}
+
+bool StaticVideoBuffer::RecordIndex(int64_t frameIndex, 
+        const std::deque<Record>& records, size_t* recordIndex) {
+
+    if (!records.empty() &&
+        frameIndex >= records.front().frameIndex && frameIndex <= records.back().frameIndex) {
+
+        if (recordIndex) {
+            *recordIndex = static_cast<size_t>(frameIndex - records.front().frameIndex);
+        }
+        return true;
+    }
+    return false;
+}
+
+bool StaticVideoBuffer::HasFrame(int64_t frameIndex) {
+    return RecordIndex(frameIndex, m_Records) || RecordIndex(frameIndex, m_RewindRecords);
+}
+
+GetResult StaticVideoBuffer::GetFrame(int64_t frameIndex, int64_t* pts, uint8_t** imageData) {
+    m_TargetFrameIndex = frameIndex;
+    if (HasError()) {
+        return GetResult::FAILURE;
+    }
+
+    size_t recordIndex;
+    Record* r = nullptr;
+    if (RecordIndex(frameIndex, m_Records, &recordIndex)) {
+        r = &m_Records[recordIndex];
+    } else if (RecordIndex(frameIndex, m_RewindRecords, &recordIndex)) {
+        r = &m_Records[recordIndex];
+    }
+
+    if (r) {
+        if (pts) {
+            *pts = r->PTS;
+        }
+        if (imageData) {
+            *imageData = r->Data;
+        }
+        return GetResult::SUCCESS;
+    }
+    return GetResult::AGAIN;
+}
+
+
+
+
+
+

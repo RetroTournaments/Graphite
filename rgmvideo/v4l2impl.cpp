@@ -34,7 +34,7 @@ using namespace rgms::video;
 
 ////////////////////////////////////////////////////////////////////////////////
 
-V4L2LiveInput::V4L2LiveInput(const std::string& input)
+V4L2VideoSource::V4L2VideoSource(const std::string& input)
     : m_Input(input) 
     , m_FileDescriptor(-1)
     , m_Streamon(false)
@@ -42,11 +42,11 @@ V4L2LiveInput::V4L2LiveInput(const std::string& input)
     Open();
 }
 
-V4L2LiveInput::~V4L2LiveInput() {
+V4L2VideoSource::~V4L2VideoSource() {
     Close();
 }
 
-void V4L2LiveInput::Open() {
+void V4L2VideoSource::Open() {
     m_FileDescriptor = open(m_Input.c_str(), O_RDWR | O_NONBLOCK);
     if (m_FileDescriptor < 0) {
         std::ostringstream os;
@@ -157,7 +157,7 @@ void V4L2LiveInput::Open() {
 
 }
 
-void V4L2LiveInput::Close() {
+void V4L2VideoSource::Close() {
     if (m_Streamon) {
         int type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
         if (v4l2_ioctl(m_FileDescriptor, VIDIOC_STREAMOFF, &type) < 0) {
@@ -174,17 +174,17 @@ void V4L2LiveInput::Close() {
     }
 }
 
-int V4L2LiveInput::Width() const {
+int V4L2VideoSource::Width() const {
     return m_Width;
 }
 
-int V4L2LiveInput::Height() const {
+int V4L2VideoSource::Height() const {
     return m_Height;
 }
 
-LiveGetResult V4L2LiveInput::Get(uint8_t* buffer, int64_t* ptsMilliseconds) {
+GetResult V4L2VideoSource::Get(uint8_t* buffer, int64_t* ptsMilliseconds) {
     if (m_LastError != "") {
-        return LiveGetResult::FAILURE;
+        return GetResult::FAILURE;
     }
     if (!m_Streamon) {
         int type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
@@ -192,7 +192,7 @@ LiveGetResult V4L2LiveInput::Get(uint8_t* buffer, int64_t* ptsMilliseconds) {
             std::ostringstream os;
             os << "VIDIOC_STREAMON failed: " << strerror(errno);
             m_LastError = os.str();
-            return LiveGetResult::FAILURE;
+            return GetResult::FAILURE;
         }
         m_Streamon = true;
     }
@@ -207,7 +207,7 @@ LiveGetResult V4L2LiveInput::Get(uint8_t* buffer, int64_t* ptsMilliseconds) {
             std::ostringstream os;
             os << "VIDIOC_QBUF failed: " << strerror(errno);
             m_LastError = os.str();
-            return LiveGetResult::FAILURE;
+            return GetResult::FAILURE;
         }
 
         // Got a frame!
@@ -219,31 +219,31 @@ LiveGetResult V4L2LiveInput::Get(uint8_t* buffer, int64_t* ptsMilliseconds) {
         if (ptsMilliseconds) {
             *ptsMilliseconds = m_GetBuffer.timestamp.tv_sec * 1000 + m_GetBuffer.timestamp.tv_usec / 1000;
         }
-        return LiveGetResult::SUCCESS;
+        return GetResult::SUCCESS;
     } else if (errno == EAGAIN) {
-        return LiveGetResult::AGAIN;
+        return GetResult::AGAIN;
     } else {
         std::ostringstream os;
         os << "VIDIOC_DQBUF failed: " << strerror(errno);
         m_LastError = os.str();
-        return LiveGetResult::FAILURE;
+        return GetResult::FAILURE;
     }
 
-    return LiveGetResult::FAILURE;
+    return GetResult::FAILURE;
 }
 
-void V4L2LiveInput::Reopen() {
+void V4L2VideoSource::Reopen() {
     Close();
     Open();
 }
 
-void V4L2LiveInput::ClearError() {
+void V4L2VideoSource::ClearError() {
     m_LastError = "";
 }
-std::string V4L2LiveInput::LastError() {
+std::string V4L2VideoSource::LastError() {
     return m_LastError;
 }
 
-std::string V4L2LiveInput::Information() {
+std::string V4L2VideoSource::Information() {
     return m_Information;
 }
