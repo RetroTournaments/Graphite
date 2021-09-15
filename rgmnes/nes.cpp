@@ -24,13 +24,13 @@
 #include <fstream>
 #include <cassert>
 
-#include "graphite/nes.h"
+#include "rgmnes/nes.h"
 
-using namespace graphite::nes;
+using namespace rgms::nes;
 
 ///////////////////////////////////////////////////////////////////////////////
 
-const Palette& graphite::nes::DefaultPalette() {
+const Palette& rgms::nes::DefaultPalette() {
     static Palette p = {
         0x52, 0x52, 0x52,  0x01, 0x1a, 0x51, 
         0x0f, 0x0f, 0x65,  0x23, 0x06, 0x63, 
@@ -499,7 +499,7 @@ static bool GetLine(std::istream& is, std::string& line) {
     return true;
 }
 
-void graphite::nes::ReadFM2File(std::istream& is,
+void rgms::nes::ReadFM2File(std::istream& is,
         std::vector<nes::ControllerState>* inputs,
         FM2Header* header) {
     if (header) {
@@ -580,7 +580,7 @@ void graphite::nes::ReadFM2File(std::istream& is,
 
 }
 
-void graphite::nes::WriteFM2File(std::ostream& os,
+void rgms::nes::WriteFM2File(std::ostream& os,
         const std::vector<ControllerState>& inputs,
         const FM2Header& header) {
 

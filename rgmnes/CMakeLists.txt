@@ -20,38 +20,26 @@
 ##
 ################################################################################
 cmake_minimum_required(VERSION 3.6)
-project(graphite)
+project(rgmnes)
 
-################################################################################
-# Graphite Lib
-#   - The library with all the components and such that make graphite a thing
-################################################################################
-add_library(graphitelib
-    graphite.cpp
-)
-target_link_libraries(graphitelib
-    rgmneslib rgmuilib rgmvideolib spdlog::spdlog
-)
 if (UNIX)
-    target_link_libraries(grapitelib
-        rgmvideolibextra stdc++fs
-    )
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-anon-enum-enum-conversion")
 endif()
 
+
 ################################################################################
-# Graphite
-#   - The actual executable
+# NES Lib
+#   - For emulating the nintendo entertainment system
 ################################################################################
-if (UNIX)
-    add_executable(graphite
-        main.cpp
-    )
-else()
-    add_executable(graphite WIN32
-        main.cpp
-    )
-endif()
-target_link_libraries(graphite
-    graphitelib
+add_library(rgmneslib
+    nes.cpp 
+    nestopiaimpl.cpp
 )
+target_include_directories(rgmneslib PUBLIC
+    ${nestopia_INCLUDE_DIRS}
+)
+target_link_libraries(rgmneslib
+    3rdnestopia
+)
+
 

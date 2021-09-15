@@ -20,38 +20,33 @@
 ##
 ################################################################################
 cmake_minimum_required(VERSION 3.6)
-project(graphite)
+project(rgmvideo)
 
 ################################################################################
-# Graphite Lib
-#   - The library with all the components and such that make graphite a thing
+# Video Lib
+#   - Library for working with video streams
 ################################################################################
-add_library(graphitelib
-    graphite.cpp
+add_library(rgmvideolib
+    video.cpp
 )
-target_link_libraries(graphitelib
-    rgmneslib rgmuilib rgmvideolib spdlog::spdlog
+target_include_directories(rgmvideolib PUBLIC
+    ${OpenCV_INCLUDE_DIRS}
+)
+target_link_libraries(rgmvideolib
+    rgmutillib
+    fmt::fmt
+    ${OpenCV_LIBRARIES}
 )
 if (UNIX)
-    target_link_libraries(grapitelib
-        rgmvideolibextra stdc++fs
+    add_library(rgmvideolibextra
+        libavimpl.cpp
+        v4l2impl.cpp
+    )
+    target_include_directories(rgmvideolibextra PUBLIC
+        ${OpenCV_INCLUDE_DIRS}
+    )
+    target_link_libraries(rgmvideolibextra
+        v4l1 v4l2 avformat avcodec avutil swscale pthread fmt::fmt
     )
 endif()
-
-################################################################################
-# Graphite
-#   - The actual executable
-################################################################################
-if (UNIX)
-    add_executable(graphite
-        main.cpp
-    )
-else()
-    add_executable(graphite WIN32
-        main.cpp
-    )
-endif()
-target_link_libraries(graphite
-    graphitelib
-)
 

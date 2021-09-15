@@ -20,39 +20,26 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-#ifndef GRAPHITE_LIBAVIMPL_HEADER
-#define GRAPHITE_LIBAVIMPL_HEADER
+#ifndef RGMS_V4L2IMPL_HEADER
+#define RGMS_V4L2IMPL_HEADER
 
-extern "C" {
-#include "libavcodec/avcodec.h"
-#include "libavformat/avformat.h"
-#include "libswscale/swscale.h"
-#include "libavutil/imgutils.h"
-#include "libavutil/avutil.h"
-#include "libavutil/time.h"
-#include "libavutil/opt.h"
-}
+#include "libv4l2.h"
+#include "linux/videodev2.h"
 
-#include "graphite/video.h"
+#include "rgmvideo/video.h"
 
-namespace graphite::video {
+namespace rgms::video {
 
-std::string AVStringError(int retcode);
-
-
-class LibAVLiveInput : public ILiveInput {
+class V4L2VideoSource : public IVideoSource {
 public:
-    // As: "https://blahblahblah.m3u8"
-    // or: "http://127.0.0.1:34613/" (remember:
-    //  streamlink --twitch-disable-ads --twitch-low-latency twitch.tv/blah 720p60 
-    //      --player-external-http)
-    LibAVLiveInput(const std::string& input); 
-    ~LibAVLiveInput();
+    // As: "/dev/videoX"
+    V4L2VideoSource(const std::string& input); 
+    ~V4L2VideoSource();
 
     int Width() const override final;
     int Height() const override final;
 
-    LiveGetResult Get(uint8_t* buffer, int64_t* ptsMilliseconds) override final;
+    GetResult Get(uint8_t* buffer, int64_t* ptsMilliseconds) override final;
     void Reopen() override final;
     void ClearError() override final;
     std::string LastError() override final;
@@ -61,21 +48,17 @@ public:
 private:
     void Open();
     void Close();
-    void ReportError(const std::string& func, int retcode);
+
 
 private:
     std::string m_Input;
     std::string m_LastError, m_Information;
-
-    AVFormatContext* m_AVFormatContext;
-    AVCodecContext* m_AVCodecContext;
-    SwsContext* m_SwsContext;
-    int m_InputIndex;
-
-    AVFrame* m_Picture;
-    AVFrame* m_BGRPicture;
-    int m_NumBytes;
-    uint8_t* m_Buffer;
+    int m_FileDescriptor;
+    int m_Width, m_Height;
+    std::vector<v4l2_buffer> m_BufferInfos;
+    std::vector<void*> m_Buffers;
+    v4l2_buffer m_GetBuffer;
+    bool m_Streamon;
 };
 
 }

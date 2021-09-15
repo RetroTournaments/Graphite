@@ -32,8 +32,8 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-#ifndef GRAPHITE_RGMUI_HEADER
-#define GRAPHITE_RGMUI_HEADER
+#ifndef RGMS_RGMUI_HEADER
+#define RGMS_RGMUI_HEADER
 
 #include <thread>
 #include <vector>
@@ -44,17 +44,10 @@
 #include "imgui.h"
 #include "opencv2/opencv.hpp"
 
-#include "graphite/util.h"
+#include "rgmutil/util.h"
 
 
-namespace graphite::rgmui {
-
-class Window;
-class IApplication;
-
-void WindowAppMainLoop(
-    Window* window, IApplication* application,
-    util::mclock::duration minimumFrameDuration = util::mclock::duration(0));
+namespace rgms::rgmui {
 
 ////////////////////////////////////////////////////////////////////////////////
 

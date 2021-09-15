@@ -25,47 +25,13 @@
 #define GL_BGR 0x80E0
 #endif
 
-#include "graphite/rgmui.h"
+#include "rgmui/rgmui.h"
 #include "GL/gl.h"
 
 #include "backends/imgui_impl_sdl.h"
 #include "backends/imgui_impl_opengl3.h"
 
-using namespace graphite::rgmui;
-
-void graphite::rgmui::WindowAppMainLoop(
-        Window* window, IApplication* application,
-        util::mclock::duration minimumFrameDuration) {
-    SDL_Event e;
-    bool running = true;
-    while (running) {
-        while (SDL_PollEvent(&e) != 0) {
-            if (window) {
-                running &= window->OnSDLEvent(e);
-            }
-            if (application) {
-                running &= application->OnSDLEventExternal(e);
-            }
-        }
-
-        auto start = util::Now();
-        if (window) {
-            window->NewFrame();
-        }
-        if (application) {
-            running &= application->OnFrameExternal();
-        }
-        if (window) {
-            window->EndFrame();
-        }
-        auto end = util::Now();
-
-        auto elapsed = end - start;
-        if (elapsed < minimumFrameDuration) {
-            std::this_thread::sleep_for(minimumFrameDuration - elapsed);
-        }
-    }
-}
+using namespace rgms::rgmui;
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -101,8 +67,12 @@ Window::Window(int winsizex, int winsizey, const std::string& name)
 
     ImGui::CreateContext();
     ImGui::StyleColorsDark();
-    ImGui_ImplSDL2_InitForOpenGL(m_Window, m_Context);
-    ImGui_ImplOpenGL3_Init("#version 330");
+    if (!ImGui_ImplSDL2_InitForOpenGL(m_Window, m_Context)) {
+        throw std::runtime_error("Failure initializing sdl for opengl, maybe update your graphics driver?");
+    }
+    if (!ImGui_ImplOpenGL3_Init("#version 330")) {
+        throw std::runtime_error("Failure initializing opengl, maybe update your graphics driver?");
+    }
 
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
@@ -260,11 +230,11 @@ void IApplication::RegisterComponent(std::shared_ptr<IApplicationComponent> comp
 
 ////////////////////////////////////////////////////////////////////////////////
 
-bool graphite::rgmui::KeyUp(const SDL_Event& e, SDL_Keycode k) {
+bool rgms::rgmui::KeyUp(const SDL_Event& e, SDL_Keycode k) {
     return e.type == SDL_KEYUP && e.key.keysym.sym == k;
 }
 
-bool graphite::rgmui::KeyUpWithCtrl(const SDL_Event& e, SDL_Keycode k) {
+bool rgms::rgmui::KeyUpWithCtrl(const SDL_Event& e, SDL_Keycode k) {
     if (KeyUp(e, k)) {
         const uint8_t* keystates = SDL_GetKeyboardState(nullptr);
         if (keystates[SDL_SCANCODE_LCTRL] || keystates[SDL_SCANCODE_RCTRL]) {
@@ -274,11 +244,11 @@ bool graphite::rgmui::KeyUpWithCtrl(const SDL_Event& e, SDL_Keycode k) {
     return false;
 }
 
-bool graphite::rgmui::KeyDown(const SDL_Event& e, SDL_Keycode k) {
+bool rgms::rgmui::KeyDown(const SDL_Event& e, SDL_Keycode k) {
     return e.type == SDL_KEYDOWN && e.key.keysym.sym == k;
 }
 
-bool graphite::rgmui::KeyDownWithCtrl(const SDL_Event& e, SDL_Keycode k) {
+bool rgms::rgmui::KeyDownWithCtrl(const SDL_Event& e, SDL_Keycode k) {
     if (KeyDown(e, k)) {
         const uint8_t* keystates = SDL_GetKeyboardState(nullptr);
         if (keystates[SDL_SCANCODE_LCTRL] || keystates[SDL_SCANCODE_RCTRL]) {
@@ -288,12 +258,12 @@ bool graphite::rgmui::KeyDownWithCtrl(const SDL_Event& e, SDL_Keycode k) {
     return false;
 }
 
-bool graphite::rgmui::ShiftIsDown() {
+bool rgms::rgmui::ShiftIsDown() {
     const uint8_t* keystates = SDL_GetKeyboardState(nullptr);
     return keystates[SDL_SCANCODE_LSHIFT] || keystates[SDL_SCANCODE_RSHIFT];
 }
 
-bool graphite::rgmui::ArrowKeyHelper(const SDL_Event& e, std::function<void(int dx, int dy)> cback,
+bool rgms::rgmui::ArrowKeyHelper(const SDL_Event& e, std::function<void(int dx, int dy)> cback,
         int shiftMultiplier) {
     if (e.type == SDL_KEYDOWN) {
         int dx = 0;
@@ -412,7 +382,7 @@ void EventQueue::PumpQueue() {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-bool graphite::rgmui::IsAnyPopupOpen() {
+bool rgms::rgmui::IsAnyPopupOpen() {
     return ImGui::IsPopupOpen("", ImGuiPopupFlags_AnyPopupId + ImGuiPopupFlags_AnyPopupLevel);
 }
 
@@ -426,7 +396,7 @@ static int InputTextCallback(ImGuiInputTextCallbackData* data) {
     return 0;
 }
 
-bool graphite::rgmui::InputText(const char* label, std::string* str, 
+bool rgms::rgmui::InputText(const char* label, std::string* str, 
         ImGuiInputTextFlags flags) {
     flags |= ImGuiInputTextFlags_CallbackResize;
     bool ret = ImGui::InputText(label, const_cast<char*>(str->c_str()), 
@@ -493,7 +463,7 @@ static bool SliderExt(T* v, T min, T max, bool allowArrowKeys, bool allowMouseWh
     return changed;
 }
 
-bool graphite::rgmui::SliderIntExt(const char* label, int* v, int min, int max,
+bool rgms::rgmui::SliderIntExt(const char* label, int* v, int min, int max,
         const char* format, ImGuiSliderFlags flags,
         bool allowArrowKeys, bool allowMouseWheel,
         int singleMove, int shiftMult) {
@@ -502,7 +472,7 @@ bool graphite::rgmui::SliderIntExt(const char* label, int* v, int min, int max,
     return changed;
 }
 
-bool graphite::rgmui::SliderFloatExt(const char* label, float* v, float min, float max,
+bool rgms::rgmui::SliderFloatExt(const char* label, float* v, float min, float max,
         const char* format, ImGuiSliderFlags flags,
         bool allowArrowKeys, bool allowMouseWheel,
         float singleMove, float shiftMult) {
@@ -512,7 +482,7 @@ bool graphite::rgmui::SliderFloatExt(const char* label, float* v, float min, flo
 }
 
 
-void graphite::rgmui::Mat(const char* label, const cv::Mat& img) {
+void rgms::rgmui::Mat(const char* label, const cv::Mat& img) {
     if (!img.isContinuous()) {
         cv::Mat m = img.clone();
         assert(m.isContinuous());
@@ -545,7 +515,7 @@ void graphite::rgmui::Mat(const char* label, const cv::Mat& img) {
 
 
 ////////////////////////////////////////////////////////////////////////////////
-cv::Mat graphite::rgmui::CropWithZeroPadding(cv::Mat img, cv::Rect cropRect) {
+cv::Mat rgms::rgmui::CropWithZeroPadding(cv::Mat img, cv::Rect cropRect) {
     if (img.empty()) {
         return img;
     }
@@ -564,7 +534,7 @@ cv::Mat graphite::rgmui::CropWithZeroPadding(cv::Mat img, cv::Rect cropRect) {
     return m;
 }
 
-cv::Mat graphite::rgmui::ConstructPaletteImage(
+cv::Mat rgms::rgmui::ConstructPaletteImage(
     const uint8_t* imgData,
     int width, int height, 
     const uint8_t* paletteData,

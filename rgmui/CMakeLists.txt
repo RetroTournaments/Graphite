@@ -20,38 +20,37 @@
 ##
 ################################################################################
 cmake_minimum_required(VERSION 3.6)
-project(graphite)
+project(rgmui)
 
 ################################################################################
-# Graphite Lib
-#   - The library with all the components and such that make graphite a thing
+# RGMUI Lib
+#   - Library with useful utilities for creating my style of user interfaces
+#     with imgui, event queue communication, opencv integration, etc.
 ################################################################################
-add_library(graphitelib
-    graphite.cpp
+add_library(rgmuilib
+    rgmui.cpp
+    rgmuimain.cpp
 )
-target_link_libraries(graphitelib
-    rgmneslib rgmuilib rgmvideolib spdlog::spdlog
+target_include_directories(rgmuilib PUBLIC
+    ${Imgui_INCLUDE_DIRS}
+    ${SDL2_INCLUDE_DIRS}
+    ${fmt_INCLUDE_DIRS}
+    ${OpenCV_INCLUDE_DIRS}
+)
+target_link_libraries(rgmuilib
+    rgmutillib 3rdimgui 
+    SDL2 
+    ${OpenCV_LIBRARIES}
+    fmt::fmt
+    spdlog::spdlog
 )
 if (UNIX)
-    target_link_libraries(grapitelib
-        rgmvideolibextra stdc++fs
-    )
-endif()
-
-################################################################################
-# Graphite
-#   - The actual executable
-################################################################################
-if (UNIX)
-    add_executable(graphite
-        main.cpp
+    target_link_libraries(rgmuilib
+        pthread GL dl
     )
 else()
-    add_executable(graphite WIN32
-        main.cpp
+    target_link_libraries(rgmuilib
+        ${OPENGL_LIBRARIES}
     )
 endif()
-target_link_libraries(graphite
-    graphitelib
-)
 

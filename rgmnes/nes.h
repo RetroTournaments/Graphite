@@ -28,8 +28,8 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-#ifndef GRAPHITE_NES_HEADER
-#define GRAPHITE_NES_HEADER
+#ifndef RGMS_NES_HEADER
+#define RGMS_NES_HEADER
 
 #include <array>
 #include <mutex>
@@ -40,7 +40,7 @@
 #include <sstream>
 #include <functional>
 
-namespace graphite::nes {
+namespace rgms::nes {
 
 inline constexpr int FRAME_WIDTH  = 256;
 inline constexpr int FRAME_HEIGHT = 240;
@@ -188,7 +188,7 @@ public:
     void SetDefaultStateString(const std::string& defaultStateString);
 
 private:
-    std::function<std::unique_ptr<graphite::nes::INESEmulator>()> m_EmulatorFactory;
+    std::function<std::unique_ptr<rgms::nes::INESEmulator>()> m_EmulatorFactory;
     std::string m_DefaultINESString;
     std::string m_DefaultStateString;
 

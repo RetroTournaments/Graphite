@@ -20,17 +20,17 @@
 ##
 ################################################################################
 cmake_minimum_required(VERSION 3.6)
-project(graphite)
+project(carbon)
 
 ################################################################################
-# Graphite Lib
-#   - The library with all the components and such that make graphite a thing
+# Carbon Lib
+#   - Components for resizing / morphing input videos into a consistent format
 ################################################################################
-add_library(graphitelib
-    graphite.cpp
+add_library(carbonlib
+    carbon.cpp
 )
-target_link_libraries(graphitelib
-    rgmneslib rgmuilib rgmvideolib spdlog::spdlog
+target_link_libraries(carbonlib
+    rgmuilib rgmvideolib spdlog::spdlog
 )
 if (UNIX)
     target_link_libraries(grapitelib
@@ -39,19 +39,21 @@ if (UNIX)
 endif()
 
 ################################################################################
-# Graphite
-#   - The actual executable
+# Carbon
+#   - The actual executable for helping define commands to resize videos to be
+#     256x240
+#   - Also used to apply the uncrt transform to a series of png files
 ################################################################################
 if (UNIX)
-    add_executable(graphite
+    add_executable(carbon
         main.cpp
     )
 else()
-    add_executable(graphite WIN32
+    add_executable(carbon WIN32
         main.cpp
     )
 endif()
-target_link_libraries(graphite
-    graphitelib
+target_link_libraries(carbon
+    carbonlib
 )
 
