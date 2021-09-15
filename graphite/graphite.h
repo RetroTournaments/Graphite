@@ -290,6 +290,7 @@ struct RAMWatchLine {
 
 
 struct RAMWatchConfig {
+    bool Display;
     std::vector<RAMWatchLine> Lines;
 
     static RAMWatchConfig Defaults();

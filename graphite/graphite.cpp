@@ -151,6 +151,7 @@ bool GraphiteApp::DoMainMenuBar() {
             }
             ImGui::PopItemWidth();
             ImGui::Checkbox("Sticky auto-scroll", &m_Config->InputsCfg.StickyAutoScroll);
+            ImGui::Checkbox("Display RAM watch", &m_Config->EmuViewCfg.RAMWatchCfg.Display);
             ImGui::EndMenu();
         }
 
@@ -925,6 +926,7 @@ EmuViewConfig EmuViewConfig::Defaults() {
     EmuViewConfig cfg;
     cfg.ScreenPeekCfg = ScreenPeekConfig::Defaults();
     cfg.RAMWatchCfg = RAMWatchConfig::SMBDefaults(); // TODO?
+    cfg.RAMWatchCfg.Display = false;
     cfg.StateSequenceThreadCfg = nes::StateSequenceThreadConfig::Defaults();
     return cfg;
 }
@@ -1126,11 +1128,13 @@ void ScreenPeekSubComponent::DoHoverTooltip(int x, int y, uint8_t pixel) {
 
 RAMWatchConfig RAMWatchConfig::Defaults() {
     RAMWatchConfig cfg;
+    cfg.Display = true;
     return cfg;
 }
 
 RAMWatchConfig RAMWatchConfig::SMBDefaults() {
     RAMWatchConfig cfg;
+    cfg.Display = true;
     cfg.Lines.emplace_back(false, "X-Speed", 0x0057);
     cfg.Lines.emplace_back(false, "X-SubSpeed", 0x0705);
     cfg.Lines.emplace_back(false, "X-Pixel", 0x0086);
@@ -1175,6 +1179,10 @@ std::string RAMWatchSubComponent::WindowName() {
 }
 
 void RAMWatchSubComponent::OnFrame() {
+    if (!m_Config->Display) {
+        return;
+    }
+
     if (ImGui::Begin(WindowName().c_str())) {
         for (auto & line : m_Config->Lines) {
             if (line.IsSeparator) {
@@ -1513,16 +1521,16 @@ void PlaybackComponent::OnFrame() {
     HandlePlaying();
 
     if (ImGui::Begin(WindowName().c_str())) {
+        rgmui::SliderFloatExt("Speed", &m_PlaybackSpeed, -7.0f, 7.0f);
+        ImGui::SameLine();
+        if (ImGui::Button("Reset")) {
+            m_PlaybackSpeed = 1.0f;
+        }
         std::string txt = (m_IsPlaying) ? "Pause" : "Play";
         if (ImGui::Button(txt.c_str())) {
             TogglePlaying();
         }
 
-        ImGui::SliderFloat("Speed", &m_PlaybackSpeed, -7.0f, 7.0f);
-        ImGui::SameLine();
-        if (ImGui::Button("Reset")) {
-            m_PlaybackSpeed = 1.0f;
-        }
     }
     ImGui::End();
 }
