@@ -38,6 +38,7 @@ V4L2VideoSource::V4L2VideoSource(const std::string& input)
     : m_Input(input) 
     , m_FileDescriptor(-1)
     , m_Streamon(false)
+    , m_ErrorState(ErrorState::NO_ERROR)
 {
     Open();
 }
@@ -52,6 +53,7 @@ void V4L2VideoSource::Open() {
         std::ostringstream os;
         os << "Failed opening video stream: " << strerror(errno);
         m_LastError = os.str();
+        m_ErrorState = ErrorState::CAN_NOT_OPEN_SOURCE;
         return;
     }
 
@@ -60,6 +62,7 @@ void V4L2VideoSource::Open() {
         std::ostringstream os;
         os << "Failed querying video capabilities: " << strerror(errno);
         m_LastError = os.str();
+        m_ErrorState = ErrorState::OTHER_ERROR;
         return;
     }
 
@@ -71,6 +74,7 @@ void V4L2VideoSource::Open() {
          << ((cap.version & 0xFF)) << std::endl;
     if (!(cap.capabilities & V4L2_CAP_VIDEO_CAPTURE)) {
         m_LastError = "Single-planar video capture not supported";
+        m_ErrorState = ErrorState::OTHER_ERROR;
         return;
     }
 
@@ -80,6 +84,7 @@ void V4L2VideoSource::Open() {
         std::ostringstream os;
         os << "VIDIOC_G_FMT failed: " << strerror(errno);
         m_LastError = os.str();
+        m_ErrorState = ErrorState::OTHER_ERROR;
         return;
     }
 
@@ -90,6 +95,7 @@ void V4L2VideoSource::Open() {
         std::ostringstream os;
         os << "VIDIOC_S_FMT failed: " << strerror(errno);
         m_LastError = os.str();
+        m_ErrorState = ErrorState::OTHER_ERROR;
         return;
     }
 
@@ -105,6 +111,7 @@ void V4L2VideoSource::Open() {
         std::ostringstream os;
         os << "VIDIOC_REQBUFS failed: " << strerror(errno);
         m_LastError = os.str();
+        m_ErrorState = ErrorState::OTHER_ERROR;
         return;
     }
 
@@ -120,6 +127,7 @@ void V4L2VideoSource::Open() {
             std::ostringstream os;
             os << "VIDIOC_REQBUFS failed: " << strerror(errno);
             m_LastError = os.str();
+            m_ErrorState = ErrorState::OTHER_ERROR;
             return;
         }
 
@@ -130,6 +138,7 @@ void V4L2VideoSource::Open() {
             std::ostringstream os;
             os << "map failed: " << strerror(errno);
             m_LastError = os.str();
+            m_ErrorState = ErrorState::OTHER_ERROR;
             return;
         }
 
@@ -141,6 +150,7 @@ void V4L2VideoSource::Open() {
             std::ostringstream os;
             os << "VIDIOC_QBUF failed: " << strerror(errno);
             m_LastError = os.str();
+            m_ErrorState = ErrorState::OTHER_ERROR;
             return;
         }
     }
@@ -164,6 +174,7 @@ void V4L2VideoSource::Close() {
             std::ostringstream os;
             os << "VIDIOC_STREAMOFF failed: " << strerror(errno);
             m_LastError = os.str();
+            m_ErrorState = ErrorState::OTHER_ERROR;
         }
         m_Streamon = false;
     }
@@ -192,6 +203,7 @@ GetResult V4L2VideoSource::Get(uint8_t* buffer, int64_t* ptsMilliseconds) {
             std::ostringstream os;
             os << "VIDIOC_STREAMON failed: " << strerror(errno);
             m_LastError = os.str();
+            m_ErrorState = ErrorState::OTHER_ERROR;
             return GetResult::FAILURE;
         }
         m_Streamon = true;
@@ -207,6 +219,7 @@ GetResult V4L2VideoSource::Get(uint8_t* buffer, int64_t* ptsMilliseconds) {
             std::ostringstream os;
             os << "VIDIOC_QBUF failed: " << strerror(errno);
             m_LastError = os.str();
+            m_ErrorState = ErrorState::OTHER_ERROR;
             return GetResult::FAILURE;
         }
 
@@ -226,6 +239,7 @@ GetResult V4L2VideoSource::Get(uint8_t* buffer, int64_t* ptsMilliseconds) {
         std::ostringstream os;
         os << "VIDIOC_DQBUF failed: " << strerror(errno);
         m_LastError = os.str();
+        m_ErrorState = ErrorState::OTHER_ERROR;
         return GetResult::FAILURE;
     }
 
@@ -239,11 +253,17 @@ void V4L2VideoSource::Reopen() {
 
 void V4L2VideoSource::ClearError() {
     m_LastError = "";
+    m_ErrorState = ErrorState::NO_ERROR;
 }
-std::string V4L2VideoSource::LastError() {
+
+ErrorState V4L2VideoSource::GetErrorState() {
+    return m_ErrorState;
+}
+
+std::string V4L2VideoSource::GetLastError() {
     return m_LastError;
 }
 
-std::string V4L2VideoSource::Information() {
+std::string V4L2VideoSource::GetInformation() {
     return m_Information;
 }

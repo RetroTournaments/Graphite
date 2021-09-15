@@ -194,7 +194,7 @@ struct StaticVideoBufferConfig {
 
 // This is a big pain because I don't want to rely on 'seeking' video files.
 // Note that this is not adequate for actual video editing or anything. It reads
-// from the beginning if you do too much 'rewinding'. :(
+// from the beginning if you go too far back
 class StaticVideoBuffer {
 public:
     StaticVideoBuffer(IVideoSourcePtr source,
@@ -210,22 +210,31 @@ public:
     int Height() const;
     int ImageDataBufferSize() const;
     int64_t CurrentKnownNumFrames() const; // will change as the input is read.
+    void UpdatePTS(std::vector<int64_t>* pts) const;
 
     bool HasFrame(int64_t frameIndex) const;
 
     // Needs to do things like reopen the input, decode frames, or read additional frames
     bool HasWork() const; 
-    void DoWork();
+    void DoWork(int64_t* frameIndex = nullptr, int64_t* pts = nullptr);
 
     // ImageData is only valid until the next call to DoWork!!!
     // If you want to keep it then copy it yourself. Watch out for
     // GetResult::AGAIN, and GetResult::FAILURE
-    GetResult GetFrame(int64_t frameIndex, int64_t* pts, uint8_t** imageData) const;
+    GetResult GetFrame(int64_t frameIndex, int64_t* pts, const uint8_t** imageData) const;
     
 private:
-    bool RecordIndex(int64_t frameIndex, const std::deque<Record>& records, 
-            size_t* recordIndex = nullptr);
+    struct Record {
+        int64_t FrameIndex;
+        int64_t PTS;
+        uint8_t* Data;
+    };
 
+    bool RecordIndex(int64_t frameIndex, const std::deque<Record>& records, 
+            size_t* recordIndex = nullptr) const;
+    bool BufferFull() const;
+    bool MustRewind() const;
+    bool MustAdvance() const;
 
 private:
     StaticVideoBufferConfig m_Config;
@@ -233,26 +242,61 @@ private:
     IVideoSourcePtr m_Source;
     int64_t m_SourceFrameIndex;
 
-    int64_t m_TargetFrameIndex;
-
-    struct Record {
-        int64_t FrameIndex;
-        int64_t PTS;
-        uint8_t* Data;
-    };
+    mutable int64_t m_TargetFrameIndex;
 
     int64_t m_CurrentKnownNumFrames;
     bool m_InputWasExhausted;
 
+    int m_MaxRecords;
+
     std::deque<Record> m_Records; // sequential by frame index
     std::vector<uint8_t> m_Data; // Big and preallocated :O
+};
 
-    // Only used if we are rewinding, which only occurs if a)
-    //  The data buffer has been completely filled, and we are seeking a target
-    //  frame index less than the lowest in records
-    // As we rewind we remove records from the end of m_Records and make new
-    // ones here, until we catch up at which point m_Records is back in business
-    std::deque<Record> m_RewindRecords; 
+struct StaticVideoThreadConfig {
+    StaticVideoBufferConfig StaticVideoBufferCfg;
+
+    static StaticVideoThreadConfig Defaults();
+};
+
+class StaticVideoThread {
+public:
+    StaticVideoThread(IVideoSourcePtr source,
+            StaticVideoThreadConfig config = StaticVideoThreadConfig::Defaults()); 
+    ~StaticVideoThread();
+
+    bool HasError() const;
+    ErrorState GetErrorState() const;
+    std::string GetError() const;
+    std::string GetInputInformation() const;
+
+    int64_t CurrentKnownNumFrames() const; // will change as the input is read.
+    LiveInputFramePtr GetFrame(int frameIndex);
+
+    void UpdatePTS(std::vector<int64_t>* pts);
+
+private:
+    void BufferThread();
+
+private:
+    StaticVideoThreadConfig m_Config;
+
+    std::atomic<bool> m_ShouldStop;
+
+    mutable std::mutex m_BufferMutex;
+
+    std::thread m_BufferThread;
+    StaticVideoBuffer m_Buffer;
+
+    std::atomic<bool> m_HasError;
+    std::atomic<ErrorState> m_ErrorState;
+
+    std::atomic<int64_t> m_CurrentKnownNumFrames;
+
+    std::string m_InformationString;
+    std::string m_ErrorString;
+    std::vector<int64_t> m_PTS;
+
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -269,8 +313,9 @@ public:
     GetResult Get(uint8_t* buffer, int64_t* ptsMilliseconds) override final;
     void Reopen() override final;
     void ClearError() override final;
-    std::string LastError() override final;
-    std::string Information() override final;
+    ErrorState GetErrorState() override final;
+    std::string GetLastError() override final;
+    std::string GetInformation() override final;
 
 private:
     bool ReadNextFrame();
@@ -285,6 +330,7 @@ private:
 
     std::string m_Input;
     std::string m_Error;
+    ErrorState m_ErrorState;
     std::unique_ptr<cv::VideoCapture> m_Capture;
 };
 

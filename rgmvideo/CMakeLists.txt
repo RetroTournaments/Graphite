@@ -22,6 +22,10 @@
 cmake_minimum_required(VERSION 3.6)
 project(rgmvideo)
 
+if (UNIX)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-anon-enum-enum-conversion")
+endif()
+
 ################################################################################
 # Video Lib
 #   - Library for working with video streams

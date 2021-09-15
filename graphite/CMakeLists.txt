@@ -33,7 +33,7 @@ target_link_libraries(graphitelib
     rgmneslib rgmuilib rgmvideolib spdlog::spdlog
 )
 if (UNIX)
-    target_link_libraries(grapitelib
+    target_link_libraries(graphitelib
         rgmvideolibextra stdc++fs
     )
 endif()

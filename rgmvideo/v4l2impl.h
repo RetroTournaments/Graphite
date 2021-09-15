@@ -42,8 +42,9 @@ public:
     GetResult Get(uint8_t* buffer, int64_t* ptsMilliseconds) override final;
     void Reopen() override final;
     void ClearError() override final;
-    std::string LastError() override final;
-    std::string Information() override final;
+    ErrorState GetErrorState() override final;
+    std::string GetLastError() override final;
+    std::string GetInformation() override final;
 
 private:
     void Open();
@@ -53,6 +54,8 @@ private:
 private:
     std::string m_Input;
     std::string m_LastError, m_Information;
+    ErrorState m_ErrorState;
+
     int m_FileDescriptor;
     int m_Width, m_Height;
     std::vector<v4l2_buffer> m_BufferInfos;

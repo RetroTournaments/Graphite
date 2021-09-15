@@ -55,17 +55,19 @@ public:
     GetResult Get(uint8_t* buffer, int64_t* ptsMilliseconds) override final;
     void Reopen() override final;
     void ClearError() override final;
-    std::string LastError() override final;
-    std::string Information() override final;
+    ErrorState GetErrorState() override final;
+    std::string GetLastError() override final;
+    std::string GetInformation() override final;
 
 private:
     void Open();
     void Close();
-    void ReportError(const std::string& func, int retcode);
+    void ReportError(const std::string& func, int retcode, ErrorState error);
 
 private:
     std::string m_Input;
     std::string m_LastError, m_Information;
+    ErrorState m_ErrorState;
 
     AVFormatContext* m_AVFormatContext;
     AVCodecContext* m_AVCodecContext;

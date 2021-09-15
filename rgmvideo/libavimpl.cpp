@@ -57,11 +57,12 @@ static int InterruptCallback(void* opaque) {
     return 0;
 }
 
-void LibAVVideoSource::ReportError(const std::string& func, int retcode) {
+void LibAVVideoSource::ReportError(const std::string& func, int retcode, ErrorState es) {
     std::ostringstream os;
     os <<  "[ERROR] in " << func << std::endl
        << "  " << AVStringError(retcode) << std::endl;
     m_LastError = os.str();
+    m_ErrorState = es;
 }
 
 void LibAVVideoSource::Open() {
@@ -76,10 +77,10 @@ void LibAVVideoSource::Open() {
     av_dict_set(&dict, "rtsp_transport", "tcp", 0);
     int ret = avformat_open_input(&m_AVFormatContext, m_Input.c_str(), nullptr, &dict);
     av_dict_free(&dict);
-    if (ret != 0) return ReportError("avformat_open_input", ret);
+    if (ret != 0) return ReportError("avformat_open_input", ret, ErrorState::CAN_NOT_OPEN_SOURCE);
 
     ret = avformat_find_stream_info(m_AVFormatContext, nullptr);
-    if (ret != 0) return ReportError("avformat_find_stream_info", ret);
+    if (ret != 0) return ReportError("avformat_find_stream_info", ret, ErrorState::OTHER_ERROR);
 
     // Set up for interruptions
     assert(m_AVFormatContext);
@@ -94,14 +95,14 @@ void LibAVVideoSource::Open() {
         AVCodecContext* avctx = avcodec_alloc_context3(nullptr);
 
         ret = avcodec_parameters_to_context(avctx, m_AVFormatContext->streams[i]->codecpar);
-        if (ret != 0) return ReportError("avcodec_parameters_to_context", ret);
+        if (ret != 0) return ReportError("avcodec_parameters_to_context", ret, ErrorState::OTHER_ERROR);
 
         avctx->pkt_timebase = m_AVFormatContext->streams[i]->time_base;
 
         AVCodec* codec = avcodec_find_decoder(avctx->codec_id);
         if (avctx->codec_type == AVMEDIA_TYPE_VIDEO) {
             ret = avcodec_open2(avctx, codec, nullptr);
-            if (ret != 0) return ReportError("avcodec_open2", ret);
+            if (ret != 0) return ReportError("avcodec_open2", ret, ErrorState::CAN_NOT_OPEN_SOURCE);
 
             m_InputIndex = i;
             m_AVCodecContext = avctx;
@@ -187,6 +188,7 @@ GetResult LibAVVideoSource::Get(uint8_t* buffer, int64_t* ptsMilliseconds) {
         m_InputIndex < 0) {
         if (m_LastError == "") {
             m_LastError = "[ERROR] in LibAVVideoSource::Get\n  Input is not open?";
+            m_ErrorState = ErrorState::CAN_NOT_OPEN_SOURCE;
         }
         return GetResult::FAILURE;
     }
@@ -201,7 +203,11 @@ GetResult LibAVVideoSource::Get(uint8_t* buffer, int64_t* ptsMilliseconds) {
     int ret = av_read_frame(m_AVFormatContext, packet);
     if (ret == AVERROR(EAGAIN)) return GetResult::AGAIN;
     if (ret != 0) {
-        ReportError("av_read_frame", ret);
+        ErrorState es = ErrorState::OTHER_ERROR;
+        if (ret == AVERROR_EOF) {
+            es = ErrorState::INPUT_EXHAUSTED;
+        }
+        ReportError("av_read_frame", ret, es);
         return GetResult::FAILURE;
     }
 
@@ -234,12 +240,18 @@ void LibAVVideoSource::Reopen() {
 
 void LibAVVideoSource::ClearError() {
     m_LastError = "";
+    m_ErrorState = ErrorState::NO_ERROR;
 }
-std::string LibAVVideoSource::LastError() {
+
+ErrorState LibAVVideoSource::GetErrorState() {
+    return m_ErrorState;
+}
+
+std::string LibAVVideoSource::GetLastError() {
     return m_LastError;
 }
 
-std::string LibAVVideoSource::Information() {
+std::string LibAVVideoSource::GetInformation() {
     return m_Information;
 }
 

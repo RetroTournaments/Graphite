@@ -87,7 +87,7 @@ LiveVideoThread::LiveVideoThread(IVideoSourcePtr source, int queueSize, bool all
     , m_AllowDiscard(allowDiscard)
     , m_StartTime(util::mclock::now())
     , m_ResetTime(m_StartTime)
-    , m_InformationString(source->Information()) 
+    , m_InformationString(source->GetInformation()) 
     , m_LiveInput(std::move(source)) 
 {
     if (!m_LiveInput) {
@@ -214,7 +214,7 @@ void LiveVideoThread::WatchingThread() {
         } else {
             {
                 std::lock_guard<std::mutex> lock(m_SharedMutex);
-                m_ErrorString = m_LiveInput->LastError();
+                m_ErrorString = m_LiveInput->GetLastError();
                 m_HasError = true;
             }
             std::this_thread::sleep_for(std::chrono::milliseconds(2));
@@ -239,8 +239,8 @@ void LiveVideoThread::Reset() {
     m_LiveInput->Reopen();
     {
         std::lock_guard<std::mutex> lock(m_SharedMutex);
-        m_ErrorString = m_LiveInput->LastError();
-        m_InformationString = m_LiveInput->Information();
+        m_ErrorString = m_LiveInput->GetLastError();
+        m_InformationString = m_LiveInput->GetInformation();
         m_HasError = m_ErrorString != "";
         m_ResetTime = util::mclock::now();
         m_Queue.clear();
@@ -312,6 +312,7 @@ void LiveVideoThread::SetQueueCapacity(int64_t capacity) {
 
 CVVideoCaptureSource::CVVideoCaptureSource(const std::string& input)
     : m_Input(input)
+    , m_ErrorState(ErrorState::NO_ERROR)
 {
     Reopen();
 }
@@ -350,7 +351,8 @@ bool CVVideoCaptureSource::ReadNextFrame() {
     m_Capture->read(m_Frame);
     m_PTS = m_Capture->get(cv::CAP_PROP_POS_MSEC);
     if (m_Frame.empty()) {
-        m_Error = "ERROR empty frame";
+        m_ErrorState = ErrorState::INPUT_EXHAUSTED;
+        m_Error = "ERROR input exhausted";
         return false;
     }
     return true;
@@ -360,6 +362,7 @@ void CVVideoCaptureSource::Reopen() {
     ClearError();
     m_Capture = std::make_unique<cv::VideoCapture>(m_Input);
     if (!m_Capture->isOpened()) {
+        m_ErrorState = ErrorState::CAN_NOT_OPEN_SOURCE;
         m_Error = "ERROR unable to open camera";
     }
 
@@ -371,14 +374,19 @@ void CVVideoCaptureSource::Reopen() {
 }
 
 void CVVideoCaptureSource::ClearError() {
+    m_ErrorState = ErrorState::NO_ERROR;
     m_Error = "";
 }
 
-std::string CVVideoCaptureSource::LastError() {
+ErrorState CVVideoCaptureSource::GetErrorState() {
+    return m_ErrorState;
+}
+
+std::string CVVideoCaptureSource::GetLastError() {
     return m_Error;
 }
 
-std::string CVVideoCaptureSource::Information() {
+std::string CVVideoCaptureSource::GetInformation() {
     return m_Input;
 }
 
@@ -398,6 +406,8 @@ StaticVideoBuffer::StaticVideoBuffer(IVideoSourcePtr source,
     , m_SourceFrameIndex(0)
     , m_TargetFrameIndex(0)
     , m_InputWasExhausted(false)
+    , m_CurrentKnownNumFrames(0)
+    , m_MaxRecords(0)
 {
     if (!m_Source) {
         throw std::invalid_argument("must provide source");
@@ -405,9 +415,9 @@ StaticVideoBuffer::StaticVideoBuffer(IVideoSourcePtr source,
 
     int imSize = ImageDataBufferSize();
     if (imSize > 0) {
-        int n = m_Config.BufferSize / imSize;
-        n += 1;
-        m_Data.resize(n * imSize);
+        m_MaxRecords = m_Config.BufferSize / imSize;
+        m_MaxRecords += 1;
+        m_Data.resize(m_MaxRecords * imSize);
     }
 }
 
@@ -446,44 +456,117 @@ int64_t StaticVideoBuffer::CurrentKnownNumFrames() const {
     return m_CurrentKnownNumFrames;
 }
 
+bool StaticVideoBuffer::BufferFull() const {
+    return m_Records.size() == m_MaxRecords;
+}
+
+bool StaticVideoBuffer::MustRewind() const {
+    if (m_Records.empty()) {
+        return false;
+    }
+    return m_TargetFrameIndex < m_Records.front().FrameIndex;
+}
+bool StaticVideoBuffer::MustAdvance() const {
+    assert(BufferFull());
+    return (m_TargetFrameIndex - m_Records.front().FrameIndex) > 
+            ((m_Records.back().FrameIndex - m_Records.front().FrameIndex) * m_Config.ForwardBias);
+}
+
 bool StaticVideoBuffer::HasWork() const {
-    // TODO can we read more?
+    if (MustRewind()) {
+        return true;
+    }
+    if ((HasError() && GetErrorState() != ErrorState::INPUT_EXHAUSTED) || m_MaxRecords == 0) {
+        return false;
+    }
+    if (!BufferFull()) {
+        return true;
+    }
+    if (MustAdvance()) {
+        return true;
+    }
+
     return false;
 }
 
-void StaticVideoBuffer::DoWork() {
-    // TODO read stuff etc
+void StaticVideoBuffer::DoWork(int64_t* frameIndex, int64_t* pts) {
+    if (frameIndex) {
+        *frameIndex = -1;
+    }
+    if (m_MaxRecords == 0) {
+        return;
+    }
+    Record newRec;
+    newRec.FrameIndex = m_SourceFrameIndex;
+    newRec.Data = nullptr;
+
+    if (MustRewind()) {
+        newRec.Data = m_Data.data();
+        m_Source->ClearError();
+        m_Source->Reopen();
+        m_SourceFrameIndex = 0;
+        newRec.FrameIndex = 0;
+        m_Records.clear();
+    }
+
+    if ((HasError() && GetErrorState() != ErrorState::INPUT_EXHAUSTED)) {
+        return;
+    }
+
+    if (!BufferFull()) {
+        newRec.Data = m_Data.data() + ImageDataBufferSize() * m_Records.size();
+    } else if (MustAdvance()) {
+        newRec.Data = m_Records.front().Data;
+        m_Records.pop_front();
+    } 
+
+    if (!BufferFull() && newRec.Data) {
+        if (m_Source->Get(newRec.Data, &newRec.PTS) == GetResult::SUCCESS) {
+            m_SourceFrameIndex++;
+            m_Records.push_back(newRec);
+            if (m_SourceFrameIndex > m_CurrentKnownNumFrames) {
+                m_CurrentKnownNumFrames = m_SourceFrameIndex;
+            }
+
+            if (frameIndex) {
+                *frameIndex = newRec.FrameIndex;
+            }
+            if (pts) {
+                *pts = newRec.PTS;
+            }
+        }
+    }
 }
 
 bool StaticVideoBuffer::RecordIndex(int64_t frameIndex, 
-        const std::deque<Record>& records, size_t* recordIndex) {
-
+        const std::deque<Record>& records, size_t* recordIndex) const {
     if (!records.empty() &&
-        frameIndex >= records.front().frameIndex && frameIndex <= records.back().frameIndex) {
+        frameIndex >= records.front().FrameIndex && frameIndex <= records.back().FrameIndex) {
 
         if (recordIndex) {
-            *recordIndex = static_cast<size_t>(frameIndex - records.front().frameIndex);
+            *recordIndex = static_cast<size_t>(frameIndex - records.front().FrameIndex);
         }
         return true;
     }
     return false;
 }
 
-bool StaticVideoBuffer::HasFrame(int64_t frameIndex) {
-    return RecordIndex(frameIndex, m_Records) || RecordIndex(frameIndex, m_RewindRecords);
+bool StaticVideoBuffer::HasFrame(int64_t frameIndex) const {
+    return RecordIndex(frameIndex, m_Records);
 }
 
-GetResult StaticVideoBuffer::GetFrame(int64_t frameIndex, int64_t* pts, uint8_t** imageData) {
+GetResult StaticVideoBuffer::GetFrame(int64_t frameIndex, int64_t* pts, const uint8_t** imageData) const {
+    if (frameIndex < 0) {
+        return GetResult::FAILURE;
+    }
     m_TargetFrameIndex = frameIndex;
-    if (HasError()) {
+    if (HasError() && GetErrorState() != ErrorState::INPUT_EXHAUSTED) {
         return GetResult::FAILURE;
     }
 
     size_t recordIndex;
-    Record* r = nullptr;
+    const Record* r = nullptr;
     if (RecordIndex(frameIndex, m_Records, &recordIndex)) {
-        r = &m_Records[recordIndex];
-    } else if (RecordIndex(frameIndex, m_RewindRecords, &recordIndex)) {
         r = &m_Records[recordIndex];
     }
 
@@ -499,6 +582,93 @@ GetResult StaticVideoBuffer::GetFrame(int64_t frameIndex, int64_t* pts, uint8_t*
     return GetResult::AGAIN;
 }
 
+////////////////////////////////////////////////////////////////////////////////
+
+StaticVideoThreadConfig StaticVideoThreadConfig::Defaults() {
+    StaticVideoThreadConfig cfg;
+    cfg.StaticVideoBufferCfg = StaticVideoBufferConfig::Defaults();
+    return cfg;
+}
+
+StaticVideoThread::StaticVideoThread(IVideoSourcePtr source,
+        StaticVideoThreadConfig config)
+    : m_Config(config)
+    , m_Buffer(std::move(source), config.StaticVideoBufferCfg)
+    , m_ShouldStop(false)
+    , m_HasError(false)
+    , m_CurrentKnownNumFrames(0)
+{
+    m_BufferThread = std::thread(
+            &StaticVideoThread::BufferThread, this);
+}
+
+StaticVideoThread::~StaticVideoThread() {
+    m_ShouldStop = true;
+    m_BufferThread.join();
+}
+
+bool StaticVideoThread::HasError() const {
+    return m_HasError;
+}
+
+ErrorState StaticVideoThread::GetErrorState() const {
+    return m_ErrorState;
+}
+
+std::string StaticVideoThread::GetError() const {
+    std::lock_guard<std::mutex> lock(m_BufferMutex);
+    return m_ErrorString;
+}
+
+std::string StaticVideoThread::GetInputInformation() const {
+    std::lock_guard<std::mutex> lock(m_BufferMutex);
+    return m_InformationString;
+}
+
+void StaticVideoThread::BufferThread() {
+    while (!m_ShouldStop) {
+        if (m_Buffer.HasWork()) {
+            {
+                std::lock_guard<std::mutex> lock(m_BufferMutex);
+                int64_t frameIndex, pts;
+                m_Buffer.DoWork(&frameIndex, &pts);
+                if (frameIndex > m_PTS.size()) {
+                    m_PTS.push_back(pts);
+                    m_CurrentKnownNumFrames = m_PTS.size();
+                }
+            }
+            std::this_thread::sleep_for(std::chrono::microseconds(100));
+        } else {
+            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+        }
+    }
+}
+
+int64_t StaticVideoThread::CurrentKnownNumFrames() const {
+    return m_CurrentKnownNumFrames;
+}
+
+LiveInputFramePtr StaticVideoThread::GetFrame(int frameIndex) {
+    std::lock_guard<std::mutex> lock(m_BufferMutex);
+
+    int64_t pts;
+    const uint8_t* data;
+    if (m_Buffer.GetFrame(frameIndex, &pts, &data) == GetResult::SUCCESS) {
+        LiveInputFramePtr f = std::make_shared<LiveInputFrame>(
+                m_Buffer.Width(), m_Buffer.Height());
+        f->FrameNumber = frameIndex;
+        f->PtsMilliseconds = pts;
+        std::memcpy(f->Buffer, data, m_Buffer.ImageDataBufferSize());
+        return f;
+    }
+    return nullptr;
+}
+
+void StaticVideoThread::UpdatePTS(std::vector<int64_t>* pts) {
+    // TODO
+    std::lock_guard<std::mutex> lock(m_BufferMutex);
+    *pts = m_PTS;
+}
 
 
 

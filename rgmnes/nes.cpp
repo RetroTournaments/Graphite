@@ -195,7 +195,7 @@ void NESEmulatorFactory::SetDefaultStateString(const std::string& defaultStateSt
 
 StateSequenceConfig StateSequenceConfig::Defaults() {
     StateSequenceConfig cfg;
-    cfg.SaveInterval = 16;
+    cfg.SaveInterval = 12;
     return cfg;
 }
 

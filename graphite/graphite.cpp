@@ -1205,6 +1205,7 @@ VideoConfig VideoConfig::Defaults() {
     cfg.MaxFrames = 40000;
     cfg.ScreenMultiplier = 3;
     cfg.OffsetMillis = 0;
+    cfg.StaticVideoThreadCfg = rgms::video::StaticVideoThreadConfig::Defaults();
 
     return cfg;
 }
@@ -1238,14 +1239,23 @@ VideoComponent::VideoComponent(rgmui::EventQueue* queue,
         }
     }
 
-    m_VideoThread = std::make_unique<video::LiveVideoThread>(
+    m_VideoThread = std::make_unique<video::StaticVideoThread>(
                 std::make_unique<video::CVVideoCaptureSource>(videoPath),
-                m_Config->MaxFrames, false);
+                m_Config->StaticVideoThreadCfg);
+
+    m_WaitingFrame = std::make_shared<video::LiveInputFrame>(nes::FRAME_WIDTH, nes::FRAME_HEIGHT);
+    cv::Mat m(m_WaitingFrame->Height,
+            m_WaitingFrame->Width,
+            CV_8UC3,
+            m_WaitingFrame->Buffer);
+    cv::putText(m, "Waiting for frame...", cv::Point(5, 100),
+            cv::FONT_HERSHEY_DUPLEX, 0.5, CV_RGB(255, 0, 0), 1);
+    cv::putText(m, "Or maybe it doesn't exist?", cv::Point(5, 150),
+            cv::FONT_HERSHEY_DUPLEX, 0.5, CV_RGB(255, 0, 0), 1);
 
     if (m_VideoThread->HasError()) {
         throw std::runtime_error(m_VideoThread->GetError());
     }
-    spdlog::info("inputs information: {}", m_VideoThread->InputInformation());
     SetBlankImage();
 }
 
@@ -1254,22 +1264,11 @@ VideoComponent::~VideoComponent() {
 }
 
 void VideoComponent::UpdatePTSs() {
-    int n = static_cast<int>(m_VideoThread->QueueSize());
+    //int n = static_cast<int>(m_VideoThread->QueueSize());
+    int n = static_cast<int>(m_VideoThread->CurrentKnownNumFrames());
     int pn = static_cast<int>(m_PTS.size());
     if (n != pn) {
-        if (pn > n) {
-            m_PTS.clear();
-            pn = 0;
-        }
-
-        m_PTS.resize(n);
-        for (int i = pn; i < n; i++) {
-            auto f = m_VideoThread->GetFrame(i);
-            assert(f);
-            m_PTS[i] = f->PtsMilliseconds;
-        }
-
-        assert(std::is_sorted(m_PTS.begin(), m_PTS.end()));
+        m_VideoThread->UpdatePTS(&m_PTS);
     }
 }
 
@@ -1329,9 +1328,14 @@ void VideoComponent::SetImageFromInputFrame() {
     }
 }
 
+
 void VideoComponent::SetVideoFrame(int videoIndex) {
     m_CurrentVideoIndex = videoIndex;
     m_LiveInputFrame = m_VideoThread->GetFrame(m_CurrentVideoIndex);
+    if (!m_LiveInputFrame) {
+        m_LiveInputFrame = m_WaitingFrame;
+    }
+
     if (m_LiveInputFrame->Height != nes::FRAME_HEIGHT || m_LiveInputFrame->Width != nes::FRAME_WIDTH) {
         throw std::runtime_error(fmt::format("Invalid video frame size '{}x{}'. Must be '{}x{}'",
             m_LiveInputFrame->Width, m_LiveInputFrame->Height, nes::FRAME_WIDTH, nes::FRAME_HEIGHT));
@@ -1375,6 +1379,9 @@ void VideoComponent::OnFrame() {
     if (m_CurrentVideoIndex == -1) {
         FindTargetFrame(0);
     }
+    if (m_LiveInputFrame == m_WaitingFrame) {
+        SetVideoFrame(m_CurrentVideoIndex);
+    }
     if (ImGui::Begin(WindowName().c_str())) {
         rgmui::Mat("screen", m_Image);
         if (ImGui::IsItemHovered()) {
@@ -1386,10 +1393,9 @@ void VideoComponent::OnFrame() {
                 if (v < 0) {
                     v = 0;
                 }
-                if (v >= m_VideoThread->QueueSize()) {
-                    v = m_VideoThread->QueueSize() - 1;
+                if (v >= m_VideoThread->CurrentKnownNumFrames()) {
+                    v = m_VideoThread->CurrentKnownNumFrames() - 1;
                 }
-
 
                 if (v != m_CurrentVideoIndex) {
                     SetVideoFrame(v);
@@ -1400,7 +1406,6 @@ void VideoComponent::OnFrame() {
         }
 
         if (m_CurrentVideoIndex >= 0 && m_CurrentVideoIndex < m_PTS.size()) {
-            //ImGui::Text("%s : %ld [%ld]", m_VideoPath.c_str(), m_CurrentVideoIndex, m_PTS[m_CurrentVideoIndex]);
 
             ImGui::PushItemWidth(120);
             if (ImGui::InputInt("sync", &m_Config->OffsetMillis)) {

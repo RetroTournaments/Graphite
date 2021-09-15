@@ -299,18 +299,18 @@ struct RAMWatchConfig {
 
 class RAMWatchSubComponent : public IEmuPeekSubComponent {
 public: 
-    RAMWatchSubComponent(rgmui::EventQueue* queue, RAMWatchConfig* config);
+    RAMWatchSubComponent(rgms::rgmui::EventQueue* queue, RAMWatchConfig* config);
     virtual ~RAMWatchSubComponent();
 
-    virtual void CacheNewEmulatorData(nes::INESEmulator* emu) override;
+    virtual void CacheNewEmulatorData(rgms::nes::INESEmulator* emu) override;
     virtual void OnFrame() override;
 
     static std::string WindowName();
 
 private:
-    rgmui::EventQueue* m_EventQueue;
+    rgms::rgmui::EventQueue* m_EventQueue;
     RAMWatchConfig* m_Config;
-    nes::Ram m_RAM;
+    rgms::nes::Ram m_RAM;
 };
 
 
@@ -346,6 +346,7 @@ struct VideoConfig {
     int MaxFrames;
     int ScreenMultiplier;
     int OffsetMillis;
+    rgms::video::StaticVideoThreadConfig StaticVideoThreadCfg;
 
     static VideoConfig Defaults();
 };
@@ -374,17 +375,20 @@ private:
     void SetVideoFrame(int videoIndex);
     void SetImageFromInputFrame();
 
+
 private:
     rgms::rgmui::EventQueue* m_EventQueue;
     VideoConfig* m_Config;
     std::string m_VideoPath;
-    std::unique_ptr<rgms::video::LiveVideoThread> m_VideoThread;
+    //std::unique_ptr<rgms::video::LiveVideoThread> m_VideoThread;
+    std::unique_ptr<rgms::video::StaticVideoThread> m_VideoThread;
 
     int64_t m_CurrentVideoIndex;
     int m_InputTarget;
 
     std::vector<int64_t> m_PTS;
     rgms::video::LiveInputFramePtr m_LiveInputFrame;
+    rgms::video::LiveInputFramePtr m_WaitingFrame;
     cv::Mat m_Image;
 };
 
