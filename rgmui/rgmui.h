@@ -92,6 +92,7 @@ protected:
     // Override these if necessary
     virtual bool OnSDLEvent(const SDL_Event& e); // Default call subcomponent
     virtual bool OnFrame();
+    virtual void OnFirstFrame();
 
     void RegisterComponent(IApplicationComponent* component);
     void RegisterComponent(std::shared_ptr<IApplicationComponent> component);
@@ -99,6 +100,7 @@ protected:
     ImGuiID GetDefaultDockspaceID();
 
 private:
+    bool m_FirstFrame;
     IApplicationConfig m_Config;
     ImGuiID m_DockspaceID;
     std::vector<IApplicationComponent*> m_Components;
@@ -179,6 +181,8 @@ bool ArrowKeyHelper(const SDL_Event& e,
 // ImGui Extensions
 ////////////////////////////////////////////////////////////////////////////////
 
+bool ArrowKeyHelperInFrame(int* dx, int* dy, int shiftMultiplier);
+
 // Favorite is : ImGuiInputTextFlags_EnterReturnsTrue
 bool InputText(const char* label, std::string* str, 
         ImGuiInputTextFlags flags = ImGuiInputTextFlags_None);
@@ -196,6 +200,79 @@ bool SliderFloatExt(const char* label, float* v, float min, float max,
 
 // Display a cv mat
 void Mat(const char* label, const cv::Mat& img);
+// Alternative mat api
+class MatAnnotator {
+public:
+    // Construct (which will display the cv::Mat)
+    //    The mat must be pre-scaled!
+    MatAnnotator(const char* label, const cv::Mat& img, 
+            float scale = 1.0f, rgms::util::Vector2F origin = {0.0f, 0.0f}, 
+            bool clipped = true);
+    ~MatAnnotator();
+
+    // Screen positions in pixels on screen
+    // Mat positions on the image (accounting for scale and origin)
+    util::Vector2F MatPosToScreenPos2F(const util::Vector2F& v) const;
+    ImVec2 MatPosToScreenPos(const util::Vector2F& v) const;
+    util::Vector2F ScreenPosToMatPos2F(const ImVec2& p) const;
+    util::Vector2I ScreenPosToMatPos2I(const ImVec2& p) const;
+
+    // Annotate the image 
+    //  - these coordinates are in MAT space (so 0, 0 to mat.cols, mat.rows)
+    void AddLine(const util::Vector2F& p1, const util::Vector2F& p2,
+                 ImU32 col, float thickness = 1.0f);
+    void AddRect(const util::Vector2F& pmin, const util::Vector2F& pmax,
+                 ImU32 col, float rounding = 0.0f, ImDrawFlags flags = 0, float thickness = 1.0f);
+    void AddRect(const util::Rect2F& rect,
+                 ImU32 col, float rounding = 0.0f, ImDrawFlags flags = 0, float thickness = 1.0f);
+    void AddRectFilled(const util::Vector2F& pmin, const util::Vector2F& pmax,
+                 ImU32 col, float rounding = 0.0f, ImDrawFlags flags = 0);
+    void AddRectFilled(const util::Rect2F& rect,
+                 ImU32 col, float rounding = 0.0f, ImDrawFlags flags = 0);
+    void AddBezierCubic(const util::Vector2F& a, const util::Vector2F& b,
+                        const util::Vector2F& c, const util::Vector2F& d,
+                        ImU32 col, float thickness = 1.0f, int num_segments = 0);
+
+
+
+    // Use the information stored within to add additional functionality
+    // (tooltips / interactivity)
+    bool IsHovered(bool requireWindowFocus = true);
+
+
+private:
+    void AddLineNC(const util::Vector2F& p1, const util::Vector2F& p2,
+                 ImU32 col, float thickness);
+    void AddRectNC(const util::Vector2F& pmin, const util::Vector2F& pmax,
+                 ImU32 col, float rounding, ImDrawFlags flags, float thickness);
+    void AddRectFilledNC(const util::Vector2F& pmin, const util::Vector2F& pmax,
+                 ImU32 col, float rounding, ImDrawFlags flags);
+    void AddBezierCubicNC(const util::Vector2F& a, const util::Vector2F& b,
+                        const util::Vector2F& c, const util::Vector2F& d,
+                        ImU32 col, float thickness, int num_segments);
+
+    class ClipHelper {
+    public:
+        ClipHelper(MatAnnotator* anno);
+        ~ClipHelper();
+
+    private:
+        MatAnnotator* m_Anno;
+    };
+
+private:
+    ImVec2 m_OriginalCursorPosition;
+    ImVec2 m_BottomRight;
+    const bool m_Clipped;
+    ImDrawList* m_List;
+
+    util::Vector2F m_Origin;
+    float m_Scale;
+
+    bool m_IsHovered;
+
+};
+
 
 bool IsAnyPopupOpen();
 

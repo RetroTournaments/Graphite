@@ -415,7 +415,7 @@ StaticVideoBuffer::StaticVideoBuffer(IVideoSourcePtr source,
 
     int imSize = ImageDataBufferSize();
     if (imSize > 0) {
-        m_MaxRecords = m_Config.BufferSize / imSize;
+        m_MaxRecords = m_Config.BufferSize / static_cast<size_t>(imSize);
         m_MaxRecords += 1;
         m_Data.resize(m_MaxRecords * imSize);
     }

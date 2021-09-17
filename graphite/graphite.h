@@ -1,6 +1,6 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
-// The Graphite Library contains the application, and the components which make
+// The Graphite library contains the application, and the components which make
 // up that application.
 //
 ////////////////////////////////////////////////////////////////////////////////
@@ -187,6 +187,7 @@ private:
     void ChangeInputTo(int frameIndex, rgms::nes::ControllerState newInput);
     void ChangeButtonTo(int frameIndex, uint8_t button, bool onoff);
     void ChangeTargetTo(int frameIndex, bool byChevronColumn);
+    void ChangeAllInputsTo(const std::vector<rgms::nes::ControllerState>& inputs);
     ImU32 TextColor(bool highlighted);
     std::string ButtonText(uint8_t button);
 
@@ -380,7 +381,6 @@ private:
     rgms::rgmui::EventQueue* m_EventQueue;
     VideoConfig* m_Config;
     std::string m_VideoPath;
-    //std::unique_ptr<rgms::video::LiveVideoThread> m_VideoThread;
     std::unique_ptr<rgms::video::StaticVideoThread> m_VideoThread;
 
     int64_t m_CurrentVideoIndex;
@@ -458,13 +458,13 @@ public:
     ~GraphiteApp();
 
     virtual bool OnFrame() override;
+    virtual void OnFirstFrame() override;
 
 private:
     void SetupDockSpace();
     bool DoMainMenuBar();
 
 private:
-    bool m_FirstFrame;
     GraphiteConfig* m_Config;
     rgms::rgmui::EventQueue m_EventQueue;
 };

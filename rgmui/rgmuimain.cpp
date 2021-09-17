@@ -22,11 +22,11 @@
 
 #include "rgmui/rgmuimain.h"
 
-void rgms::rgmui::InitializeDefaultLogger() {
+void rgms::rgmui::InitializeDefaultLogger(const std::string& name) {
     auto console_sink = std::make_shared<spdlog::sinks::stdout_color_sink_mt>();
-    auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>("graphite.log", true);
+    auto file_sink = std::make_shared<spdlog::sinks::basic_file_sink_mt>(name + ".log", true);
     std::vector<std::shared_ptr<spdlog::sinks::sink>> sinks = {console_sink, file_sink};
-    auto logger = std::make_shared<spdlog::logger>("graphite", sinks.begin(), sinks.end());
+    auto logger = std::make_shared<spdlog::logger>(name, sinks.begin(), sinks.end());
     spdlog::set_default_logger(logger);
 }
 

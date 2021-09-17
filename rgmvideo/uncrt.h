@@ -1,9 +1,5 @@
 ////////////////////////////////////////////////////////////////////////////////
 //
-// File with helpers for defining a 'main' function
-//
-////////////////////////////////////////////////////////////////////////////////
-//
 // Copyright (C) 2021-2021 FlibidyDibidy
 //
 // This file is part of Graphite.
@@ -24,33 +20,24 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-#ifndef RGMS_RGMUIMAIN_HEADER
-#define RGMS_RGMUIMAIN_HEADER
+#ifndef RGMS_UNCRT_HEADER
+#define RGMS_UNCRT_HEADER
 
-#ifdef _WIN32
-#include <windows.h>
-#endif
+#include "opencv2/opencv.hpp"
 
-#include <iostream>
+#include "rgmutil/util.h"
 
-#include "spdlog/spdlog.h"
-#include "spdlog/sinks/stdout_color_sinks.h"
-#include "spdlog/sinks/basic_file_sink.h"
+namespace rgms::video {
 
-#include "rgmui/rgmui.h"
+typedef std::vector<std::vector<std::pair<size_t, float>>> PixelContributions;
 
-namespace rgms::rgmui {
+void ComputePixelContributions(int rows, int cols, const util::BezierPatch& patch,
+    PixelContributions* contrib, int outx, int outy);
 
-void InitializeDefaultLogger(const std::string& name);
-void RedirectIO(); // only does stuff on windows
-void LogAndDisplayException(const std::exception& e);
-void WindowAppMainLoop(
-    Window* window, IApplication* application,
-    util::mclock::duration minimumFrameDuration = util::mclock::duration(0));
-
-
-
+cv::Mat RemoveCRT(const cv::Mat& frame, const PixelContributions& contrib, 
+        int outx, int outy);
 
 }
 
 #endif
+

@@ -30,7 +30,7 @@ int main(int argc, char** argv) {
 
     int ret = 0;
     try {
-        rgmui::InitializeDefaultLogger();
+        rgmui::InitializeDefaultLogger("graphite");
         spdlog::info("program started");
 
         GraphiteConfig config = GraphiteConfig::Defaults();
@@ -57,7 +57,7 @@ int main(int argc, char** argv) {
 
             GraphiteApp app(&config);
             spdlog::info("main loop initiated");
-            rgmui::WindowAppMainLoop(&window, &app, std::chrono::microseconds(10000));
+            rgmui::WindowAppMainLoop(&window, &app, std::chrono::microseconds(16333));
         }
     } catch(const std::exception& e) {
         rgmui::LogAndDisplayException(e);

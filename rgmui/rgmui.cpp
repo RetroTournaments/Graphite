@@ -32,6 +32,7 @@
 #include "backends/imgui_impl_opengl3.h"
 
 using namespace rgms::rgmui;
+using namespace rgms::util;
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -173,6 +174,7 @@ IApplicationConfig IApplicationConfig::Defaults() {
 IApplication::IApplication(IApplicationConfig config) 
     : m_Config(config)
     , m_DockspaceID(0)
+    , m_FirstFrame(true)
 {
 }
 
@@ -201,6 +203,10 @@ bool IApplication::OnFrameExternal() {
     if (m_Config.DefaultDockspace) {
         m_DockspaceID = ImGui::DockSpaceOverViewport();
     }
+    if (m_FirstFrame) {
+        OnFirstFrame();
+        m_FirstFrame = false;
+    }
     bool r = OnFrame();
 
     if (r) {
@@ -217,6 +223,9 @@ bool IApplication::OnSDLEvent(const SDL_Event& e) {
 
 bool IApplication::OnFrame() {
     return true;
+}
+
+void IApplication::OnFirstFrame() {
 }
 
 void IApplication::RegisterComponent(IApplicationComponent* component) {
@@ -519,6 +528,14 @@ cv::Mat rgms::rgmui::CropWithZeroPadding(cv::Mat img, cv::Rect cropRect) {
     if (img.empty()) {
         return img;
     }
+    if (cropRect.width < 0) {
+        cropRect.x += cropRect.width;
+        cropRect.width = -cropRect.width;
+    }
+    if (cropRect.height < 0) {
+        cropRect.y += cropRect.height;
+        cropRect.height = -cropRect.height;
+    }
 
     cv::Rect imgRect = cv::Rect(0, 0, img.cols, img.rows);
     cv::Rect overLapRect = imgRect & cropRect;
@@ -564,5 +581,164 @@ cv::Mat rgms::rgmui::ConstructPaletteImage(
         imgData++;
     }
     return m;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+MatAnnotator::MatAnnotator(const char* label, const cv::Mat& mat, float scale, Vector2F origin, 
+        bool clipped)
+    : m_OriginalCursorPosition(ImGui::GetCursorScreenPos())
+    , m_List(ImGui::GetWindowDrawList())
+    , m_Scale(scale)
+    , m_Origin(origin)
+    , m_Clipped(clipped)
+{
+    Mat(label, mat);
+    m_BottomRight.x = m_OriginalCursorPosition.x + mat.cols * scale;
+    m_BottomRight.y = m_OriginalCursorPosition.y + mat.rows * scale;
+
+    m_IsHovered = ImGui::IsItemHovered();
+
+}
+
+MatAnnotator::~MatAnnotator() {
+}
+
+
+MatAnnotator::ClipHelper::ClipHelper(MatAnnotator* anno) 
+    : m_Anno(anno)
+{
+    if (m_Anno->m_Clipped) {
+        m_Anno->m_List->PushClipRect(
+                m_Anno->m_OriginalCursorPosition,
+                m_Anno->m_BottomRight, true);
+    }
+}
+
+MatAnnotator::ClipHelper::~ClipHelper() {
+    if (m_Anno->m_Clipped) {
+        m_Anno->m_List->PopClipRect();
+    }
+}
+
+Vector2F MatAnnotator::MatPosToScreenPos2F(const Vector2F& v) const {
+    Vector2F q;
+    q.x = (v.x * m_Scale) + m_OriginalCursorPosition.x - m_Origin.x;
+    q.y = (v.y * m_Scale) + m_OriginalCursorPosition.y - m_Origin.y;
+    return q;
+}
+
+Vector2F MatAnnotator::ScreenPosToMatPos2F(const ImVec2& p) const {
+    Vector2F v;
+    v.x = (p.x + m_Origin.x - m_OriginalCursorPosition.x) / m_Scale; 
+    v.y = (p.y + m_Origin.y - m_OriginalCursorPosition.y) / m_Scale; 
+    return v;
+}
+
+Vector2I MatAnnotator::ScreenPosToMatPos2I(const ImVec2& p) const {
+    Vector2F v = ScreenPosToMatPos2F(p);
+    return Vector2I(std::round(v.x), std::round(v.y));
+}
+
+ImVec2 MatAnnotator::MatPosToScreenPos(const Vector2F& v) const {
+    Vector2F q = MatPosToScreenPos2F(v);
+    return ImVec2(q.x, q.y);
+}
+
+void MatAnnotator::AddLine(const Vector2F& p1, const Vector2F& p2, ImU32 col, float thickness) {
+    auto clip = ClipHelper(this);
+    AddLineNC(p1, p2, col, thickness);
+}
+
+void MatAnnotator::AddLineNC(const Vector2F& p1, const Vector2F& p2, ImU32 col, float thickness) {
+    m_List->AddLine(
+            MatPosToScreenPos(p1), MatPosToScreenPos(p2),
+            col, thickness);
+}
+
+void MatAnnotator::AddBezierCubic(const Vector2F& p1, const Vector2F& p2, const Vector2F& p3, const Vector2F& p4, ImU32 col, float thickness, int num_segments) {
+    auto clip = ClipHelper(this);
+    AddBezierCubicNC(p1, p2, p3, p4, col, thickness, num_segments);
+}
+
+void MatAnnotator::AddBezierCubicNC(const Vector2F& p1, const Vector2F& p2, const Vector2F& p3, const Vector2F& p4, ImU32 col, float thickness, int num_segments) {
+    m_List->AddBezierCubic(
+            MatPosToScreenPos(p1), MatPosToScreenPos(p2),
+            MatPosToScreenPos(p3), MatPosToScreenPos(p4),
+            col, thickness, num_segments);
+}
+
+void MatAnnotator::AddRect(const Vector2F& pmin, const Vector2F& pmax,
+                 ImU32 col, float rounding, ImDrawFlags flags, float thickness) {
+    auto clip = ClipHelper(this);
+    AddRectNC(pmin, pmax, col, rounding, flags, thickness);
+}
+
+void MatAnnotator::AddRect(const Rect2F& rect,
+                 ImU32 col, float rounding, ImDrawFlags flags, float thickness) {
+    AddRect(rect.TopLeft(), rect.BottomRight(),
+            col, rounding, flags, thickness);
+}
+
+void MatAnnotator::AddRectNC(const Vector2F& pmin, const Vector2F& pmax,
+                 ImU32 col, float rounding, ImDrawFlags flags, float thickness) {
+    m_List->AddRect(
+            MatPosToScreenPos(pmin), MatPosToScreenPos(pmax),
+            col, rounding, flags, thickness);
+}
+
+void MatAnnotator::AddRectFilled(const Vector2F& pmin, const Vector2F& pmax,
+        ImU32 col, float rounding, ImDrawFlags flags) {
+    auto clip = ClipHelper(this);
+    AddRectFilledNC(pmin, pmax, col, rounding, flags);
+}
+
+void MatAnnotator::AddRectFilled(const Rect2F& rect, 
+        ImU32 col, float rounding, ImDrawFlags flags) {
+    AddRectFilled(rect.TopLeft(), rect.BottomRight(), col, rounding, flags);
+}
+
+void MatAnnotator::AddRectFilledNC(const Vector2F& pmin, const Vector2F& pmax,
+        ImU32 col, float rounding, ImDrawFlags flags) {
+    m_List->AddRectFilled(
+            MatPosToScreenPos(pmin), MatPosToScreenPos(pmax),
+            col, rounding, flags);
+}
+
+bool MatAnnotator::IsHovered(bool requireWindowFocus) {
+    return m_IsHovered && 
+        (!requireWindowFocus || ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows));
+}
+
+bool rgms::rgmui::ArrowKeyHelperInFrame(int* dx, int* dy, int shiftMultiplier) {
+    int tdx = 0;
+    int tdy = 0;
+    if (ImGui::IsKeyPressed(SDL_SCANCODE_LEFT)) {
+        tdx = -1;
+    }
+    if (ImGui::IsKeyPressed(SDL_SCANCODE_RIGHT)) {
+        tdx = 1;
+    }
+    if (ImGui::IsKeyPressed(SDL_SCANCODE_UP)) {
+        tdy = -1;
+    }
+    if (ImGui::IsKeyPressed(SDL_SCANCODE_DOWN)) {
+        tdy = 1;
+    }
+    if (ShiftIsDown()) {
+        tdx *= shiftMultiplier;
+        tdy *= shiftMultiplier;
+    }
+    if (tdx || tdy) {
+        if (dx) {
+            *dx = tdx;
+        }
+        if (dy) {
+            *dy = tdy;
+        }
+
+        return true;
+    }
+    return false;
 
 }

@@ -186,7 +186,7 @@ private:
 // A class that has its own thread that tries to have frames available as
 // necessary
 struct StaticVideoBufferConfig {
-    int BufferSize; // in bytes, you should give quite a bit of space!!! (will round up!)
+    size_t BufferSize; // in bytes, you should give quite a bit of space!!! (will round up!)
     float ForwardBias; // defaults to 0.5, meaning say you have room for 100 frames and you just read frame #324, we will try to have 274 to 374 in the buffer.
 
     static StaticVideoBufferConfig Defaults();

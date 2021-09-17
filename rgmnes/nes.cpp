@@ -555,7 +555,7 @@ void rgms::nes::ReadFM2File(std::istream& is,
         }
 
         if (readingInputs) {
-            if (line.size() != 14) {
+            if (!(line.size() == 14 || line.size() == 22)) {
                 std::ostringstream os;
                 os << "invalid entry on line " << lineNumber << ": '" << line << "'";
                 throw std::invalid_argument(os.str());

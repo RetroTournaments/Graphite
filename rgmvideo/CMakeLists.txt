@@ -32,6 +32,7 @@ endif()
 ################################################################################
 add_library(rgmvideolib
     video.cpp
+    uncrt.cpp
 )
 target_include_directories(rgmvideolib PUBLIC
     ${OpenCV_INCLUDE_DIRS}

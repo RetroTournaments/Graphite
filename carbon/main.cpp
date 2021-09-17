@@ -30,40 +30,31 @@ int main(int argc, char** argv) {
     util::ArgNext(&argc, &argv); // Skip path argument
     int ret = 0;
 
-//    try {
-//        rgmui::InitializeDefaultLogger();
-//        spdlog::info("program started");
-//
-//        GraphiteConfig config = GraphiteConfig::Defaults();
-//        // TODO load config / window size / ImGui::IniSettings from a file
-//
-//        rgmui::Window window(1920, 1080, "Graphite");
-//        spdlog::info("window created");
-//        ImGuiIO& io = ImGui::GetIO();
-//        io.IniFilename = NULL; 
-//
-//        bool wasExited = false;
-//        if (!ParseArgumentsToConfig(&argc, &argv, &config)) {
-//            spdlog::warn("did not parse command line arguments");
-//
-//            GraphiteConfigApp cfgApp(&wasExited, &config);
-//            rgmui::WindowAppMainLoop(&window, &cfgApp, std::chrono::microseconds(10000));
-//        }
-//
-//        if (!wasExited) {
-//            spdlog::info("config completed");
-//            spdlog::info("ines path: {}", config.InesPath);
-//            spdlog::info("video path: {}", config.VideoPath);
-//            spdlog::info("fm2 path: {}", config.FM2Path);
-//
-//            GraphiteApp app(&config);
-//            spdlog::info("main loop initiated");
-//            rgmui::WindowAppMainLoop(&window, &app, std::chrono::microseconds(10000));
-//        }
-//    } catch(const std::exception& e) {
-//        rgmui::LogAndDisplayException(e);
-//        ret = 1;
-//    }
+    try {
+        rgmui::InitializeDefaultLogger("carbon");
+        spdlog::info("program started");
+
+        CarbonConfig config = CarbonConfig::Defaults();
+        if (!ParseArgumentsToConfig(&argc, &argv, &config)) {
+            spdlog::error("usage: carbon in_path out_path <filter>");
+            ret = 1;
+        } else {
+            spdlog::info("in path: {}", config.InPath);
+            spdlog::info("out path: {}", config.OutPath);
+
+            rgmui::Window window(2800, 1200, "Carbon");
+            spdlog::info("window created");
+
+            CarbonApp app(&config);
+            spdlog::info("app created");
+
+            spdlog::info("main loop initiated");
+            rgmui::WindowAppMainLoop(&window, &app, std::chrono::microseconds(16333));
+        }
+    } catch(const std::exception& e) {
+        rgmui::LogAndDisplayException(e);
+        ret = 1;
+    }
     spdlog::info("program ended");
     return ret;
 }
@@ -74,4 +65,6 @@ int APIENTRY WinMain(HINSTANCE hInst, HINSTANCE hInstPrev, PSTR cmdline, int cmd
     rgmui::RedirectIO();
     return main(__argc, __argv);
 }
+
 #endif
+

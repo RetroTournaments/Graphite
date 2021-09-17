@@ -69,7 +69,6 @@ bool graphite::ParseArgumentsToConfig(int* argc, char*** argv, GraphiteConfig* c
 
 GraphiteApp::GraphiteApp(GraphiteConfig* config) 
     : m_Config(config)
-    , m_FirstFrame(true)
 {
     RegisterComponent(std::make_shared<NESEmulatorComponent>(
                 &m_EventQueue, m_Config->InesPath, &m_Config->EmuViewCfg));
@@ -112,16 +111,15 @@ void GraphiteApp::SetupDockSpace() {
     ImGui::DockBuilderDockWindow(RAMWatchSubComponent::WindowName().c_str(), emuNode);
 
     ImGui::DockBuilderFinish(dockspaceId);
+}
 
+void GraphiteApp::OnFirstFrame() {
+    if (m_Config->DoInitialDockspaceSetup) {
+        SetupDockSpace();
+    }
 }
 
 bool GraphiteApp::OnFrame() {
-    if (m_FirstFrame) {
-        if (m_Config->DoInitialDockspaceSetup) {
-            SetupDockSpace();
-        }
-        m_FirstFrame = false;
-    }
     if (!DoMainMenuBar()) {
         return false;
     }
@@ -605,8 +603,22 @@ void InputsComponent::DoInputLine(int frameIndex) {
         ImGui::OpenPopupOnItemClick("frame_popup");
     }
     if (ImGui::BeginPopup("frame_popup")) {
-        if (ImGui::MenuItem(fmt::format("clear {}", frameIndex).c_str())) {
+        if (ImGui::MenuItem(fmt::format("clear {}", frameIndex + 1).c_str())) {
             ChangeInputTo(frameIndex, 0x00);
+        }
+        if (ImGui::MenuItem(fmt::format("insert before {}", frameIndex + 1).c_str())) {
+            if (frameIndex < m_Inputs.size()) {
+                std::vector<rgms::nes::ControllerState> inputs = m_Inputs;
+                inputs.insert(inputs.begin() + frameIndex, 0x00);
+                ChangeAllInputsTo(inputs);
+            }
+        }
+        if (ImGui::MenuItem(fmt::format("delete {}", frameIndex + 1).c_str())) {
+            if (frameIndex < m_Inputs.size()) {
+                std::vector<rgms::nes::ControllerState> inputs = m_Inputs;
+                inputs.erase(inputs.begin() + frameIndex);
+                ChangeAllInputsTo(inputs);
+            }
         }
 
         ImGui::EndPopup();
@@ -615,6 +627,28 @@ void InputsComponent::DoInputLine(int frameIndex) {
 
 
     ImGui::PopID();
+}
+
+void InputsComponent::ChangeAllInputsTo(const std::vector<rgms::nes::ControllerState>& inputs) {
+    int numChanges = 0;
+    for (size_t i = inputs.size(); i < m_Inputs.size(); i++) {
+        if (m_Inputs[i] != 0x00) {
+            m_UndoRedo.ChangeInputTo(i, 0x00);
+            numChanges++;
+        }
+    }
+
+    for (size_t i = 0; i < std::min(inputs.size(), m_Inputs.size()); i++) {
+        if (inputs[i] != m_Inputs[i]) {
+            m_UndoRedo.ChangeInputTo(i, inputs[i]);
+            numChanges++;
+        }
+    }
+
+    if (numChanges > 0) {
+        m_Inputs = inputs;
+        m_UndoRedo.ConsolidateLast(numChanges);
+    }
 }
 
 void InputsComponent::ChangeInputTo(int frameIndex, nes::ControllerState newState) {
