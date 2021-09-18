@@ -383,6 +383,7 @@ private:
     std::string m_VideoPath;
     std::unique_ptr<rgms::video::StaticVideoThread> m_VideoThread;
 
+    float m_PlatformFPS;
     int64_t m_CurrentVideoIndex;
     int m_InputTarget;
 

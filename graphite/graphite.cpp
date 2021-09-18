@@ -238,7 +238,7 @@ InputsConfig InputsConfig::Defaults() {
     cfg.FrameTextColumnWidth = 40;
     cfg.ButtonWidth = 29;
     cfg.FrameTextNumDigits = 6;
-    cfg.MaxInputSize = 40000;
+    cfg.MaxInputSize = 25000;
     cfg.ScrollOffset = 10;
     cfg.TextColor = IM_COL32(255, 255, 255, 128);
     cfg.HighlightTextColor = IM_COL32_WHITE;
@@ -263,6 +263,7 @@ InputsComponent::InputsComponent(rgmui::EventQueue* queue,
     , m_CouldToggleLock(false)
     , m_TargetIndex(0)
     , m_CurrentIndex(0)
+    , m_OffsetMillis(0)
 {
     m_Drag.Clear();
     queue->SubscribeI(EventType::SET_INPUT_TARGET_TO, [&](int v){
@@ -1252,6 +1253,7 @@ VideoComponent::VideoComponent(rgmui::EventQueue* queue,
     , m_CurrentVideoIndex(-1)
     , m_InputTarget(0)
     , m_VideoPath(videoPath)
+    , m_PlatformFPS(static_cast<float>(nes::NTSC_FPS))
 {
     m_EventQueue->SubscribeI(EventType::INPUT_TARGET_SET_TO, [&](int v){
         m_InputTarget = v;
@@ -1311,7 +1313,12 @@ int64_t VideoComponent::FrameIndexToPTS(int frameIndex) {
     double denom = static_cast<double>(nes::NTSC_FPS_DENOMINATOR);
     double numer = static_cast<double>(nes::NTSC_FPS_NUMERATOR);
 
-    int64_t targetPts = static_cast<int64_t>(std::round((fi * denom * 1000) / numer)) + m_Config->OffsetMillis;
+    double q = 1;
+    if (m_PlatformFPS > 0) {
+        q = nes::NTSC_FPS / m_PlatformFPS;
+    }
+
+    int64_t targetPts = static_cast<int64_t>(std::round(((fi * q) * denom * 1000) / numer)) + m_Config->OffsetMillis;
     return targetPts;
 }
 
@@ -1319,7 +1326,12 @@ int VideoComponent::PTSToFrameIndex(int64_t pts) {
     double denom = static_cast<double>(nes::NTSC_FPS_DENOMINATOR);
     double numer = static_cast<double>(nes::NTSC_FPS_NUMERATOR);
 
-    double fi = ((pts - m_Config->OffsetMillis) * numer) / (denom * 1000);
+    double q = 1;
+    if (m_PlatformFPS > 0) {
+        q = nes::NTSC_FPS / m_PlatformFPS;
+    }
+
+    double fi = (((pts - m_Config->OffsetMillis) * numer) / (denom * 1000)) / q;
     return static_cast<int>(std::round(fi));
 }
 
@@ -1460,6 +1472,12 @@ void VideoComponent::OnFrame() {
                 SetOffset(m_PTS[m_CurrentVideoIndex]);
                 m_EventQueue->PublishI(EventType::SET_INPUT_TARGET_TO, 0);
             }
+            ImGui::SameLine();
+            ImGui::PushItemWidth(120);
+            if (ImGui::InputFloat("Platform FPS", &m_PlatformFPS)) {
+                FindTargetFrame(m_InputTarget);
+            }
+            ImGui::PopItemWidth();
         }
     }
     ImGui::End();
