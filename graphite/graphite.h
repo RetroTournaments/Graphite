@@ -31,6 +31,8 @@
 #include <string>
 #include <unordered_set>
 
+#include "nlohmann/json.hpp"
+
 #include "rgmui/rgmui.h"
 #include "rgmnes/nes.h"
 #include "rgmvideo/video.h"
@@ -87,7 +89,6 @@ struct InputsConfig {
     int ButtonWidth;
     int FrameTextNumDigits;
     int MaxInputSize;
-    int ScrollOffset;
 
     bool StickyAutoScroll;
 
@@ -97,6 +98,19 @@ struct InputsConfig {
 
     static InputsConfig Defaults();
 };
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(InputsConfig,
+    ColumnPadding,
+    ChevronColumnWidth,
+    FrameTextColumnWidth,
+    ButtonWidth,
+    FrameTextNumDigits,
+    MaxInputSize,
+    StickyAutoScroll,
+    TextColor,
+    HighlightTextColor,
+    ButtonColor
+);
+
 
 class UndoRedo {
 public:
@@ -250,6 +264,10 @@ struct ScreenPeekConfig {
 
     static ScreenPeekConfig Defaults();
 };
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ScreenPeekConfig,
+    ScreenMultiplier,
+    NESPalette
+);
 
 class ScreenPeekSubComponent : public IEmuPeekSubComponent {
 public:
@@ -282,12 +300,18 @@ private:
 };
 
 struct RAMWatchLine {
+    RAMWatchLine();
     RAMWatchLine(bool isSep, std::string name, uint16_t addr);
 
     bool IsSeparator;
     std::string Name;
     uint16_t Address;
 };
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(RAMWatchLine,
+    IsSeparator,
+    Name,
+    Address
+);
 
 
 struct RAMWatchConfig {
@@ -297,6 +321,10 @@ struct RAMWatchConfig {
     static RAMWatchConfig Defaults();
     static RAMWatchConfig SMBDefaults();
 };
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(RAMWatchConfig,
+    Display,
+    Lines
+);
 
 class RAMWatchSubComponent : public IEmuPeekSubComponent {
 public: 
@@ -323,6 +351,11 @@ struct EmuViewConfig {
 
     static EmuViewConfig Defaults();
 };
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(EmuViewConfig,
+    ScreenPeekCfg,
+    RAMWatchCfg,
+    StateSequenceThreadCfg
+);
 
 class EmuViewComponent : public rgms::rgmui::IApplicationComponent {
 public:
@@ -344,13 +377,17 @@ private:
 };
 
 struct VideoConfig {
-    int MaxFrames;
     int ScreenMultiplier;
     int OffsetMillis;
     rgms::video::StaticVideoThreadConfig StaticVideoThreadCfg;
 
     static VideoConfig Defaults();
 };
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(VideoConfig,
+    ScreenMultiplier,
+    OffsetMillis,
+    StaticVideoThreadCfg
+);
 
 class VideoComponent : public rgms::rgmui::IApplicationComponent {
 public:
@@ -422,8 +459,11 @@ struct GraphiteConfig {
     std::string InesPath;
     std::string VideoPath;
     std::string FM2Path;
+    bool SaveConfig;
 
-    bool DoInitialDockspaceSetup;
+    int WindowWidth;
+    int WindowHeight;
+    std::string ImguiIniSettings;
 
     InputsConfig InputsCfg;
     EmuViewConfig EmuViewCfg;
@@ -431,8 +471,23 @@ struct GraphiteConfig {
 
     static GraphiteConfig Defaults();
 };
-bool ParseArgumentsToConfig(int* argc, char*** argv, GraphiteConfig* config);
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(GraphiteConfig,
+    InesPath,
+    VideoPath,
+    FM2Path,
+    SaveConfig,
+    WindowWidth,
+    WindowHeight,
+    ImguiIniSettings,
+    InputsCfg,
+    EmuViewCfg,
+    VideoCfg
+);
+
+bool ParseArgumentsToConfig(int* argc, char*** argv, const char* configfile, 
+        GraphiteConfig* config);
 void SetFM2PathFromVideoPath(GraphiteConfig* config);
+
 class GraphiteConfigApp : public rgms::rgmui::IApplication {
 public:
     GraphiteConfigApp(bool* wasExited, GraphiteConfig* config);

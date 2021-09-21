@@ -32,6 +32,9 @@ add_library(graphitelib
 target_link_libraries(graphitelib
     rgmneslib rgmuilib rgmvideolib spdlog::spdlog
 )
+target_include_directories(graphitelib PUBLIC
+    ${nlohmann_json_INCLUDE_DIRS}
+)
 if (UNIX)
     target_link_libraries(graphitelib
         rgmvideolibextra stdc++fs

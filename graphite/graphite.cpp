@@ -40,10 +40,12 @@ using namespace rgms;
 
 GraphiteConfig GraphiteConfig::Defaults() {
     GraphiteConfig config;
+    config.SaveConfig = true;
+    config.WindowWidth = 1920;
+    config.WindowHeight = 1080;
     config.InputsCfg = InputsConfig::Defaults();
     config.EmuViewCfg = EmuViewConfig::Defaults();
     config.VideoCfg = VideoConfig::Defaults();
-    config.DoInitialDockspaceSetup = true;
     return config;
 }
 
@@ -52,7 +54,35 @@ void graphite::SetFM2PathFromVideoPath(GraphiteConfig* config) {
     config->FM2Path = fmt::format("{}.fm2", path.stem().string());
 }
 
-bool graphite::ParseArgumentsToConfig(int* argc, char*** argv, GraphiteConfig* config) {
+bool graphite::ParseArgumentsToConfig(int* argc, char*** argv, const char* configfile, GraphiteConfig* config) {
+    bool readConfigFile = true;
+    std::string arg;
+    if (util::ArgPeekString(argc, argv, &arg)) {
+        if (arg == "--no-config") {
+            readConfigFile = false;
+            util::ArgNext(argc, argv);
+        }
+    }
+
+    if (readConfigFile) {
+        std::ifstream ifs(configfile);
+        if (ifs.good()) {
+            nlohmann::json j;
+            ifs >> j;
+            try {
+                nlohmann::from_json(j, *config);
+                config->InesPath == "";
+                config->VideoPath == "";
+                config->FM2Path == "";
+            } catch (nlohmann::detail::out_of_range e) {
+                spdlog::warn("incomplete config, maybe from previous version?");
+                *config = GraphiteConfig::Defaults();
+            }
+        }
+    } else {
+        config->SaveConfig = false;
+    }
+
     if (*argc == 2) {
         util::ArgReadString(argc, argv, &config->InesPath);
         util::ArgReadString(argc, argv, &config->VideoPath);
@@ -114,7 +144,7 @@ void GraphiteApp::SetupDockSpace() {
 }
 
 void GraphiteApp::OnFirstFrame() {
-    if (m_Config->DoInitialDockspaceSetup) {
+    if (m_Config->ImguiIniSettings.empty()) {
         SetupDockSpace();
     }
 }
@@ -239,7 +269,6 @@ InputsConfig InputsConfig::Defaults() {
     cfg.ButtonWidth = 29;
     cfg.FrameTextNumDigits = 6;
     cfg.MaxInputSize = 25000;
-    cfg.ScrollOffset = 10;
     cfg.TextColor = IM_COL32(255, 255, 255, 128);
     cfg.HighlightTextColor = IM_COL32_WHITE;
     cfg.ButtonColor = IM_COL32(215, 25, 25, 255);
@@ -1192,6 +1221,10 @@ RAMWatchConfig RAMWatchConfig::SMBDefaults() {
     return cfg;
 }
 
+RAMWatchLine::RAMWatchLine()
+{
+}
+
 RAMWatchLine::RAMWatchLine(bool isSep, std::string name, uint16_t addr)
     : IsSeparator(isSep)
     , Name(name)
@@ -1243,7 +1276,6 @@ void RAMWatchSubComponent::OnFrame() {
 
 VideoConfig VideoConfig::Defaults() {
     VideoConfig cfg;
-    cfg.MaxFrames = 40000;
     cfg.ScreenMultiplier = 3;
     cfg.OffsetMillis = 0;
     cfg.StaticVideoThreadCfg = rgms::video::StaticVideoThreadConfig::Defaults();

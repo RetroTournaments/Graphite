@@ -19,11 +19,15 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 
+#include <fstream>
+
 #include "rgmui/rgmuimain.h"
 #include "graphite/graphite.h"
 
 using namespace graphite;
 using namespace rgms;
+
+const char* CONFIG_FILE = "graphite.json";
 
 int main(int argc, char** argv) {
     util::ArgNext(&argc, &argv); // Skip path argument
@@ -34,17 +38,24 @@ int main(int argc, char** argv) {
         spdlog::info("program started");
 
         GraphiteConfig config = GraphiteConfig::Defaults();
-        // TODO load config / window size / ImGui::IniSettings from a file
+        bool useConfigApp = false;
+        if (!ParseArgumentsToConfig(&argc, &argv, CONFIG_FILE, &config)) {
+            spdlog::warn("did not parse command line arguments");
+            useConfigApp = true;
+        }
 
-        rgmui::Window window(1920, 1080, "Graphite");
+        rgmui::Window window(config.WindowWidth, config.WindowHeight, "Graphite");
         spdlog::info("window created");
         ImGuiIO& io = ImGui::GetIO();
         io.IniFilename = NULL; 
 
-        bool wasExited = false;
-        if (!ParseArgumentsToConfig(&argc, &argv, &config)) {
-            spdlog::warn("did not parse command line arguments");
+        if (!config.ImguiIniSettings.empty()) {
+            ImGui::LoadIniSettingsFromMemory(config.ImguiIniSettings.c_str());
+        }
 
+        bool wasExited = false;
+
+        if (useConfigApp) {
             GraphiteConfigApp cfgApp(&wasExited, &config);
             rgmui::WindowAppMainLoop(&window, &cfgApp, std::chrono::microseconds(10000));
         }
@@ -58,7 +69,18 @@ int main(int argc, char** argv) {
             GraphiteApp app(&config);
             spdlog::info("main loop initiated");
             rgmui::WindowAppMainLoop(&window, &app, std::chrono::microseconds(16333));
+
+            if (config.SaveConfig) {
+                config.ImguiIniSettings = std::string(ImGui::SaveIniSettingsToMemory());
+                config.WindowWidth = window.ScreenWidth();
+                config.WindowHeight = window.ScreenHeight();
+
+                std::ofstream of("graphite.json");
+                of << std::setw(2) << nlohmann::json(config) << std::endl;
+                spdlog::info("config saved");
+            }
         }
+
     } catch(const std::exception& e) {
         rgmui::LogAndDisplayException(e);
         ret = 1;
