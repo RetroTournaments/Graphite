@@ -634,14 +634,14 @@ void InputsComponent::ChangeAllInputsTo(const std::vector<rgms::nes::ControllerS
     int numChanges = 0;
     for (size_t i = inputs.size(); i < m_Inputs.size(); i++) {
         if (m_Inputs[i] != 0x00) {
-            m_UndoRedo.ChangeInputTo(i, 0x00);
+            m_UndoRedo.ChangeInputTo(static_cast<int>(i), 0x00);
             numChanges++;
         }
     }
 
     for (size_t i = 0; i < std::min(inputs.size(), m_Inputs.size()); i++) {
         if (inputs[i] != m_Inputs[i]) {
-            m_UndoRedo.ChangeInputTo(i, inputs[i]);
+            m_UndoRedo.ChangeInputTo(static_cast<int>(i), inputs[i]);
             numChanges++;
         }
     }

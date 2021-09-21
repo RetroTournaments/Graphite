@@ -253,32 +253,27 @@ inline VectorBase<T, n> operator/(VectorBase<T, n> lhs, const VectorBase<T, n>& 
 template <typename T, size_t n, typename U>
 inline VectorBase<T, n> operator+(VectorBase<T, n> lhs, U rhs) {
     static_assert(std::is_convertible<T, U>::value, "Error: Source type not convertible to destination type.");
-    lhs += rhs; return lhs;
+    lhs += static_cast<T>(rhs); return lhs;
 }
 template <typename T, size_t n, typename U>
 inline VectorBase<T, n> operator-(VectorBase<T, n> lhs, U rhs) {
     static_assert(std::is_convertible<T, U>::value, "Error: Source type not convertible to destination type.");
-    lhs -= rhs; return lhs;
+    lhs -= static_cast<T>(rhs); return lhs;
 }
 template <typename T, size_t n, typename U>
 inline VectorBase<T, n> operator*(VectorBase<T, n> lhs, U rhs) {
     static_assert(std::is_convertible<T, U>::value, "Error: Source type not convertible to destination type.");
-    lhs *= rhs; return lhs;
+    lhs *= static_cast<T>(rhs); return lhs;
 }
 template <typename T, size_t n, typename U>
 inline VectorBase<T, n> operator/(VectorBase<T, n> lhs, U rhs) {
     static_assert(std::is_convertible<T, U>::value, "Error: Source type not convertible to destination type.");
-    lhs /= rhs; return lhs;
+    lhs /= static_cast<T>(rhs); return lhs;
 }
 template <typename T, size_t n, typename U>
 inline VectorBase<T, n> operator*(U lhs, VectorBase<T, n> rhs) {
     static_assert(std::is_convertible<T, U>::value, "Error: Source type not convertible to destination type.");
     rhs *= lhs; return rhs;
-}
-template <typename T, size_t n, typename U>
-inline VectorBase<T, n> operator/(U lhs, VectorBase<T, n> rhs) {
-    static_assert(std::is_convertible<T, U>::value, "Error: Source type not convertible to destination type.");
-    rhs /= lhs; return rhs;
 }
 // Equality operators
 template <typename T, size_t n>

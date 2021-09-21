@@ -415,7 +415,7 @@ StaticVideoBuffer::StaticVideoBuffer(IVideoSourcePtr source,
 
     int imSize = ImageDataBufferSize();
     if (imSize > 0) {
-        m_MaxRecords = m_Config.BufferSize / static_cast<size_t>(imSize);
+        m_MaxRecords = static_cast<int>(m_Config.BufferSize / static_cast<size_t>(imSize));
         m_MaxRecords += 1;
         m_Data.resize(m_MaxRecords * imSize);
     }
@@ -632,7 +632,7 @@ void StaticVideoThread::BufferThread() {
                 std::lock_guard<std::mutex> lock(m_BufferMutex);
                 int64_t frameIndex, pts;
                 m_Buffer.DoWork(&frameIndex, &pts);
-                if (frameIndex > m_PTS.size()) {
+                if (frameIndex > static_cast<int>(m_PTS.size())) {
                     m_PTS.push_back(pts);
                     m_CurrentKnownNumFrames = m_PTS.size();
                 }

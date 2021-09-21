@@ -38,6 +38,8 @@
 
 #include "rgmutil/util.h"
 
+#undef NO_ERROR
+
 namespace rgms::video {
 
 enum class GetResult {

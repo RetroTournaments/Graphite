@@ -637,7 +637,7 @@ Vector2F MatAnnotator::ScreenPosToMatPos2F(const ImVec2& p) const {
 
 Vector2I MatAnnotator::ScreenPosToMatPos2I(const ImVec2& p) const {
     Vector2F v = ScreenPosToMatPos2F(p);
-    return Vector2I(std::round(v.x), std::round(v.y));
+    return Vector2I(static_cast<int>(std::round(v.x)), static_cast<int>(std::round(v.y)));
 }
 
 ImVec2 MatAnnotator::MatPosToScreenPos(const Vector2F& v) const {
