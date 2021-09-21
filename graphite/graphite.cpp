@@ -404,7 +404,7 @@ std::string InputsComponent::ButtonText(uint8_t button) {
     return bt;
 }
 
-void InputsComponent::ChangeTargetTo(int frameIndex, bool byChevronColumn) {
+void InputsComponent::ChangeTargetTo(int frameIndex, bool byUserInteraction) {
     if (frameIndex < 0) {
         frameIndex = 0;
     }
@@ -414,7 +414,7 @@ void InputsComponent::ChangeTargetTo(int frameIndex, bool byChevronColumn) {
     if (frameIndex != m_TargetIndex) {
         m_TargetIndex = frameIndex;
         m_EventQueue->PublishI(EventType::INPUT_TARGET_SET_TO, m_TargetIndex);
-        m_TargetScroller.OnTargetChange(byChevronColumn);
+        m_TargetScroller.OnTargetChange(byUserInteraction);
     }
 }
 
@@ -547,6 +547,9 @@ void InputsComponent::DoInputLine(int frameIndex) {
     if (!rgmui::IsAnyPopupOpen() && ImGui::IsMouseHoveringRect(tul, tlr)) {
         if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && m_AllowDragging) {
             m_Drag.StartDrag(frameIndex, 0x00, m_Inputs[frameIndex], false);
+            if (m_LockTarget == -1) {
+                m_TargetScroller.SuspendAutoScroll();
+            }
         }
     }
 
@@ -571,6 +574,9 @@ void InputsComponent::DoInputLine(int frameIndex) {
 
             if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
                 m_Drag.StartDrag(frameIndex, button, button, buttonOn);
+                if (m_LockTarget == -1) {
+                    m_TargetScroller.SuspendAutoScroll();
+                }
             }
             if (ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
                 if (m_Drag.IsDragging && m_Drag.StartFrameIndex == frameIndex &&
@@ -654,7 +660,7 @@ void InputsComponent::ChangeAllInputsTo(const std::vector<rgms::nes::ControllerS
 
 void InputsComponent::ChangeInputTo(int frameIndex, nes::ControllerState newState) {
     if (m_LockTarget == -1) {
-        ChangeTargetTo(frameIndex, false);
+        ChangeTargetTo(frameIndex, true);
     }
     if (m_Drag.HighlightedFrames.find(frameIndex) == m_Drag.HighlightedFrames.end()) {
         m_UndoRedo.ChangeInputTo(frameIndex, newState);
@@ -847,8 +853,8 @@ void InputsComponent::TargetScroller::SuspendAutoScroll() {
     m_AutoScroll = false;
 }
 
-void InputsComponent::TargetScroller::OnTargetChange(bool byChevronColumn) {
-    if (!byChevronColumn && m_AutoScrollWasSetOnByUser && m_InputsComponent->m_Config->StickyAutoScroll) {
+void InputsComponent::TargetScroller::OnTargetChange(bool byUserInteraction) {
+    if (!byUserInteraction && m_AutoScrollWasSetOnByUser && m_InputsComponent->m_Config->StickyAutoScroll) {
         m_AutoScroll = true;
     }
 }

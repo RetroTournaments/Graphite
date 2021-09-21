@@ -52,7 +52,7 @@ enum EventType : int {
     NES_FRAME_SET_TO, // int
     NES_STATE_SET_TO, // std::string
 
-    INPUT_SET_TO, // InputChangeEvent
+    INPUT_SET_TO,  // InputChangeEvent
     OFFSET_SET_TO, // int
     SET_OFFSET_TO, // int
 
