@@ -273,6 +273,7 @@ InputsConfig InputsConfig::Defaults() {
     cfg.HighlightTextColor = IM_COL32_WHITE;
     cfg.ButtonColor = IM_COL32(215, 25, 25, 255);
     cfg.StickyAutoScroll = true;
+    cfg.VisibleButtons = 0b11111111;
 
     return cfg;
 }
@@ -588,6 +589,9 @@ void InputsComponent::DoInputLine(int frameIndex) {
     int bx = m_ColumnX[TASEditorInputsColumnIndices::BUTTONS];
     int buttonCount = 0;
     for (uint8_t button = 0x01; button != 0; button <<= 1) {
+        if (!(button & m_Config->VisibleButtons)) {
+            continue;
+        }
         bool buttonOn = thisInput & button;
         bool highlighted = inHighlightList && (button & m_Drag.HLButtons);
 

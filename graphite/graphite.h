@@ -91,6 +91,7 @@ struct InputsConfig {
     int MaxInputSize;
 
     bool StickyAutoScroll;
+    uint8_t VisibleButtons;
 
     ImU32 TextColor;
     ImU32 HighlightTextColor;
@@ -106,6 +107,7 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(InputsConfig,
     FrameTextNumDigits,
     MaxInputSize,
     StickyAutoScroll,
+    VisibleButtons,
     TextColor,
     HighlightTextColor,
     ButtonColor
