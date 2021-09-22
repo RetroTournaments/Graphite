@@ -40,10 +40,12 @@ using namespace rgms;
 
 GraphiteConfig GraphiteConfig::Defaults() {
     GraphiteConfig config;
+    config.SaveConfig = true;
+    config.WindowWidth = 1920;
+    config.WindowHeight = 1080;
     config.InputsCfg = InputsConfig::Defaults();
     config.EmuViewCfg = EmuViewConfig::Defaults();
     config.VideoCfg = VideoConfig::Defaults();
-    config.DoInitialDockspaceSetup = true;
     return config;
 }
 
@@ -52,7 +54,35 @@ void graphite::SetFM2PathFromVideoPath(GraphiteConfig* config) {
     config->FM2Path = fmt::format("{}.fm2", path.stem().string());
 }
 
-bool graphite::ParseArgumentsToConfig(int* argc, char*** argv, GraphiteConfig* config) {
+bool graphite::ParseArgumentsToConfig(int* argc, char*** argv, const char* configfile, GraphiteConfig* config) {
+    bool readConfigFile = true;
+    std::string arg;
+    if (util::ArgPeekString(argc, argv, &arg)) {
+        if (arg == "--no-config") {
+            readConfigFile = false;
+            util::ArgNext(argc, argv);
+        }
+    }
+
+    if (readConfigFile) {
+        std::ifstream ifs(configfile);
+        if (ifs.good()) {
+            nlohmann::json j;
+            ifs >> j;
+            try {
+                nlohmann::from_json(j, *config);
+                config->InesPath == "";
+                config->VideoPath == "";
+                config->FM2Path == "";
+            } catch (nlohmann::detail::out_of_range e) {
+                spdlog::warn("incomplete config, maybe from previous version?");
+                *config = GraphiteConfig::Defaults();
+            }
+        }
+    } else {
+        config->SaveConfig = false;
+    }
+
     if (*argc == 2) {
         util::ArgReadString(argc, argv, &config->InesPath);
         util::ArgReadString(argc, argv, &config->VideoPath);
@@ -114,7 +144,7 @@ void GraphiteApp::SetupDockSpace() {
 }
 
 void GraphiteApp::OnFirstFrame() {
-    if (m_Config->DoInitialDockspaceSetup) {
+    if (m_Config->ImguiIniSettings.empty()) {
         SetupDockSpace();
     }
 }
@@ -239,11 +269,11 @@ InputsConfig InputsConfig::Defaults() {
     cfg.ButtonWidth = 29;
     cfg.FrameTextNumDigits = 6;
     cfg.MaxInputSize = 25000;
-    cfg.ScrollOffset = 10;
     cfg.TextColor = IM_COL32(255, 255, 255, 128);
     cfg.HighlightTextColor = IM_COL32_WHITE;
     cfg.ButtonColor = IM_COL32(215, 25, 25, 255);
     cfg.StickyAutoScroll = true;
+    cfg.VisibleButtons = 0b11111111;
 
     cfg.Hotkeys = {
         {SDL_SCANCODE_1, true, InputAction::SMB_JUMP_EARLIER},
@@ -424,7 +454,7 @@ std::string InputsComponent::ButtonText(uint8_t button) {
     return bt;
 }
 
-void InputsComponent::ChangeTargetTo(int frameIndex, bool byChevronColumn) {
+void InputsComponent::ChangeTargetTo(int frameIndex, bool byUserInteraction) {
     if (frameIndex < 0) {
         frameIndex = 0;
     }
@@ -434,7 +464,7 @@ void InputsComponent::ChangeTargetTo(int frameIndex, bool byChevronColumn) {
     if (frameIndex != m_TargetIndex) {
         m_TargetIndex = frameIndex;
         m_EventQueue->PublishI(EventType::INPUT_TARGET_SET_TO, m_TargetIndex);
-        m_TargetScroller.OnTargetChange(byChevronColumn);
+        m_TargetScroller.OnTargetChange(byUserInteraction);
     }
 }
 
@@ -566,6 +596,9 @@ void InputsComponent::DoInputLine(int frameIndex) {
     if (!rgmui::IsAnyPopupOpen() && ImGui::IsMouseHoveringRect(tul, tlr)) {
         if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && m_AllowDragging) {
             m_Drag.StartDrag(frameIndex, 0x00, m_Inputs[frameIndex], false);
+            if (m_LockTarget == -1) {
+                m_TargetScroller.SuspendAutoScroll();
+            }
         }
     }
 
@@ -575,6 +608,9 @@ void InputsComponent::DoInputLine(int frameIndex) {
     int bx = m_ColumnX[TASEditorInputsColumnIndices::BUTTONS];
     int buttonCount = 0;
     for (uint8_t button = 0x01; button != 0; button <<= 1) {
+        if (!(button & m_Config->VisibleButtons)) {
+            continue;
+        }
         bool buttonOn = thisInput & button;
         bool highlighted = inHighlightList && (button & m_Drag.HLButtons);
 
@@ -590,6 +626,9 @@ void InputsComponent::DoInputLine(int frameIndex) {
 
             if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
                 m_Drag.StartDrag(frameIndex, button, button, buttonOn);
+                if (m_LockTarget == -1) {
+                    m_TargetScroller.SuspendAutoScroll();
+                }
             }
             if (ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
                 if (m_Drag.IsDragging && m_Drag.StartFrameIndex == frameIndex &&
@@ -721,14 +760,14 @@ void InputsComponent::ChangeAllInputsTo(const std::vector<rgms::nes::ControllerS
     int numChanges = 0;
     for (size_t i = inputs.size(); i < m_Inputs.size(); i++) {
         if (m_Inputs[i] != 0x00) {
-            m_UndoRedo.ChangeInputTo(i, 0x00);
+            m_UndoRedo.ChangeInputTo(static_cast<int>(i), 0x00);
             numChanges++;
         }
     }
 
     for (size_t i = 0; i < std::min(inputs.size(), m_Inputs.size()); i++) {
         if (inputs[i] != m_Inputs[i]) {
-            m_UndoRedo.ChangeInputTo(i, inputs[i]);
+            m_UndoRedo.ChangeInputTo(static_cast<int>(i), inputs[i]);
             numChanges++;
         }
     }
@@ -741,7 +780,7 @@ void InputsComponent::ChangeAllInputsTo(const std::vector<rgms::nes::ControllerS
 
 void InputsComponent::ChangeInputTo(int frameIndex, nes::ControllerState newState, bool isDragging) {
     if (m_LockTarget == -1) {
-        ChangeTargetTo(frameIndex, false);
+        ChangeTargetTo(frameIndex, true);
     }
     if (isDragging) {
         if (m_Drag.HighlightedFrames.find(frameIndex) == m_Drag.HighlightedFrames.end()) {
@@ -939,8 +978,8 @@ void InputsComponent::TargetScroller::SuspendAutoScroll() {
     m_AutoScroll = false;
 }
 
-void InputsComponent::TargetScroller::OnTargetChange(bool byChevronColumn) {
-    if (!byChevronColumn && m_AutoScrollWasSetOnByUser && m_InputsComponent->m_Config->StickyAutoScroll) {
+void InputsComponent::TargetScroller::OnTargetChange(bool byUserInteraction) {
+    if (!byUserInteraction && m_AutoScrollWasSetOnByUser && m_InputsComponent->m_Config->StickyAutoScroll) {
         m_AutoScroll = true;
     }
 }
@@ -1278,6 +1317,10 @@ RAMWatchConfig RAMWatchConfig::SMBDefaults() {
     return cfg;
 }
 
+RAMWatchLine::RAMWatchLine()
+{
+}
+
 RAMWatchLine::RAMWatchLine(bool isSep, std::string name, uint16_t addr)
     : IsSeparator(isSep)
     , Name(name)
@@ -1329,7 +1372,6 @@ void RAMWatchSubComponent::OnFrame() {
 
 VideoConfig VideoConfig::Defaults() {
     VideoConfig cfg;
-    cfg.MaxFrames = 40000;
     cfg.ScreenMultiplier = 3;
     cfg.OffsetMillis = 0;
     cfg.StaticVideoThreadCfg = rgms::video::StaticVideoThreadConfig::Defaults();

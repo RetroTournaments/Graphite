@@ -207,10 +207,10 @@ StateSequenceConfig StateSequenceConfig::Defaults() {
 
 StateSequence::StateSequence(
         std::unique_ptr<INESEmulator>&& emu,
-        StateSequenceConfig config,
+        StateSequenceConfig cfg,
         const std::vector<ControllerState>& initialStates)
     : m_Emulator(std::move(emu))
-    , m_Config(config)
+    , m_Config(cfg)
     , m_TargetIndex(0)
     , m_CurrentIndex(0)
     , m_Inputs(initialStates)
@@ -364,7 +364,7 @@ StateSequenceThreadConfig StateSequenceThreadConfig::Defaults() {
     cfg.NoWorkDelayMillis = 2;
     cfg.TryLockTries = 3;
     cfg.TryLockDelayMicros = 5;
-    cfg.StateSequenceConfig = StateSequenceConfig::Defaults();
+    cfg.StateSequenceCfg = StateSequenceConfig::Defaults();
     return cfg;
 }
 
@@ -372,7 +372,7 @@ StateSequenceThread::StateSequenceThread(StateSequenceThreadConfig cfg,
             std::unique_ptr<INESEmulator>&& emu,
             const std::vector<ControllerState>& initialStates)
     : m_Config(cfg)
-    , m_StateSequence(std::move(emu), m_Config.StateSequenceConfig, initialStates)
+    , m_StateSequence(std::move(emu), m_Config.StateSequenceCfg, initialStates)
     , m_TargetIndex(0)
     , m_LatestIndex(0)
     , m_OnNewStateIndex(-1)

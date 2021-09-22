@@ -95,3 +95,11 @@ set(spdlog_INCLUDE_DIRS
     PARENT_SCOPE
 )
 
+################################################################################
+# nlohmann Json
+################################################################################
+set(nlohmann_json_INCLUDE_DIRS
+    "${CMAKE_CURRENT_SOURCE_DIR}/json/include"
+    PARENT_SCOPE
+)
+

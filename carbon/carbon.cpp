@@ -51,22 +51,33 @@ cv::Mat carbon::GetFilterPerspectiveMatrix(int width, int height, const FilterCo
         inquad[i] = cv::Point2f(filter.Quad[i].x, filter.Quad[i].y);
     }
 
+    float w = static_cast<float>(width);
+    float h = static_cast<float>(height);
+
     cv::Point2f outquad[4];
-    outquad[0] = cv::Point2f(0, 0);
-    outquad[1] = cv::Point2f(width, 0);
-    outquad[2] = cv::Point2f(width, height);
-    outquad[3] = cv::Point2f(0, height);
+    outquad[0] = cv::Point2f(0.0f, 0.0f);
+    outquad[1] = cv::Point2f(w, 0.0f);
+    outquad[2] = cv::Point2f(w, h);
+    outquad[3] = cv::Point2f(0.0f, h);
 
     return cv::getPerspectiveTransform(inquad, outquad);
 }
 
 cv::Mat carbon::ApplyFilter(const cv::Mat img, const FilterConfig& filter, 
         const rgms::video::PixelContributions& contributions) {
+    cv::Rect cropRect(
+        static_cast<int>(std::round(filter.Crop.X)),
+        static_cast<int>(std::round(filter.Crop.Y)),
+        static_cast<int>(std::round(filter.Crop.Width)),
+        static_cast<int>(std::round(filter.Crop.Height))
+    );
+
     if (filter.Type == FilterType::CROP) {
-        cv::Mat ret = rgms::rgmui::CropWithZeroPadding(img, 
-                cv::Rect(filter.Crop.X, filter.Crop.Y, filter.Crop.Width, filter.Crop.Height));
+
+        cv::Mat ret = rgms::rgmui::CropWithZeroPadding(img, cropRect);
         if (!(ret.rows == 0 || ret.cols == 0)) {
-            cv::resize(ret, ret, {filter.OutWidth, filter.OutHeight}, 0, 0, cv::INTER_AREA);
+            cv::resize(ret, ret, {filter.OutWidth, filter.OutHeight}, 
+                    0, 0, cv::INTER_AREA);
         }
         return ret;
     } else if (filter.Type == FilterType::UNCRT) {
@@ -76,8 +87,7 @@ cv::Mat carbon::ApplyFilter(const cv::Mat img, const FilterConfig& filter,
         cv::Mat m = GetFilterPerspectiveMatrix(img.cols, img.rows, filter);
         cv::warpPerspective(img, ret, m, img.size());
 
-        ret = rgms::rgmui::CropWithZeroPadding(ret, 
-                cv::Rect(filter.Crop.X, filter.Crop.Y, filter.Crop.Width, filter.Crop.Height));
+        ret = rgms::rgmui::CropWithZeroPadding(ret, cropRect);
         if (!(ret.rows == 0 || ret.cols == 0)) {
             cv::resize(ret, ret, {filter.OutWidth, filter.OutHeight}, 0, 0, cv::INTER_AREA);
         }
@@ -309,10 +319,10 @@ bool CarbonApp::OnFrame() {
             if (m_LiveInputFrame) {
                 if (ImGui::Button("set perspective crop")) {
                     changed = true;
-                    filter->Crop.X = 0;
-                    filter->Crop.Y = 0;
-                    filter->Crop.Width = m_LiveInputFrame->Width;
-                    filter->Crop.Height = m_LiveInputFrame->Height;
+                    filter->Crop.X = 0.0f;
+                    filter->Crop.Y = 0.0f;
+                    filter->Crop.Width = static_cast<float>(m_LiveInputFrame->Width);
+                    filter->Crop.Height = static_cast<float>(m_LiveInputFrame->Height);
                 }
                 ImGui::Checkbox("quad handles", &m_QuadHandlesActive);
             }
@@ -343,11 +353,11 @@ bool CarbonApp::OnFrame() {
 
     if (ImGui::Begin("in frame")) {
         ImGui::PushItemWidth(300);
-        if (rgmui::SliderIntExt("frame", &m_VideoFrame, 0, m_VideoThread->CurrentKnownNumFrames() - 1)) {
+        if (rgmui::SliderIntExt("frame", &m_VideoFrame, 0, static_cast<int>(m_VideoThread->CurrentKnownNumFrames()) - 1)) {
             changed = true;
         }
 
-        if (rgmui::SliderFloatExt("mult", &m_FrameMult, 0.1, 3.0)) {
+        if (rgmui::SliderFloatExt("mult", &m_FrameMult, 0.1f, 3.0f)) {
             changed = true;
         }
         ImGui::PopItemWidth();
@@ -367,7 +377,9 @@ bool CarbonApp::OnFrame() {
             if (m_SelectedHandle != -1) {
                 int dx, dy;
                 if (rgms::rgmui::ArrowKeyHelperInFrame(&dx, &dy, 8)) {
-                    m_Handles[m_SelectedHandle]->Shift(util::Vector2F(dx, dy));
+                    m_Handles[m_SelectedHandle]->Shift(util::Vector2F(
+                                static_cast<float>(dx),
+                                static_cast<float>(dy)));
                     changed = true;
                     if (m_Config->FilterCfg.Type == FilterType::UNCRT) {
                         uncrtchanged = true;
@@ -421,18 +433,22 @@ bool CarbonApp::OnFrame() {
             rgmui::MatAnnotator mat("out", m_OutImage, m_OutMult); 
             // TODO account for xdiv etc
             for (int x = 0; x < 256; x += 8) {
-                int w = 1;
+                float w = 1.0f;
                 if (x % 16 == 0) {
-                    w = 2;
+                    w = 2.0f;
                 }
-                mat.AddLine(util::Vector2F(x, 0), util::Vector2F(x, 240), IM_COL32(255, 0, 0, 255), w);
+                util::Vector2F a(static_cast<float>(x),   0.0f);
+                util::Vector2F b(static_cast<float>(x), 240.0f);
+                mat.AddLine(a, b, IM_COL32(255, 0, 0, 255), w);
             }
             for (int y = 0; y < 240; y += 8) {
-                int w = 1;
+                float w = 1.0f;
                 if (y % 16 == 0) {
-                    w = 2;
+                    w = 2.0f;
                 }
-                mat.AddLine(util::Vector2F(0, y), util::Vector2F(256, y), IM_COL32(255, 0, 0, 255), w);
+                util::Vector2F a(  0.0f, static_cast<float>(y));
+                util::Vector2F b(256.0f, static_cast<float>(y));
+                mat.AddLine(a, b, IM_COL32(255, 0, 0, 255), w);
             }
         }
     }

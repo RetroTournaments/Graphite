@@ -38,6 +38,8 @@
 
 #include "rgmutil/util.h"
 
+#undef NO_ERROR
+
 namespace rgms::video {
 
 enum class GetResult {
@@ -191,6 +193,12 @@ struct StaticVideoBufferConfig {
 
     static StaticVideoBufferConfig Defaults();
 };
+#ifdef NLOHMANN_JSON_VERSION_MAJOR
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(StaticVideoBufferConfig,
+    BufferSize,
+    ForwardBias
+);
+#endif
 
 // This is a big pain because I don't want to rely on 'seeking' video files.
 // Note that this is not adequate for actual video editing or anything. It reads
@@ -258,6 +266,11 @@ struct StaticVideoThreadConfig {
 
     static StaticVideoThreadConfig Defaults();
 };
+#ifdef NLOHMANN_JSON_VERSION_MAJOR
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(StaticVideoThreadConfig,
+    StaticVideoBufferCfg
+);
+#endif
 
 class StaticVideoThread {
 public:

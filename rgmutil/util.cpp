@@ -193,7 +193,7 @@ Vector2F rgms::util::EvaluateBezier(float t, const Vector2F& a,
         const Vector2F& b, const Vector2F& c, const Vector2F& d) {
     float t2 = t * t;
     float t3 = t2 * t;
-    float tm = 1.0 - t;
+    float tm = 1.0f - t;
     float tm2 = tm * tm;
     float tm3 = tm2 * tm;
     return tm3 * a + (3.0f * tm2 * t) * b + (3.0f * tm * t2) * c + (t3) * d;

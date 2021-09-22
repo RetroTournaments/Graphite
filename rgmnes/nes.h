@@ -202,11 +202,16 @@ typedef std::shared_ptr<NESEmulatorFactory> NESEmulatorFactorySPtr;
 // for the TAS Editing side of things.
 struct StateSequenceConfig {
     int SaveInterval;
-    int KeepNumPrevious;
 
     //
     static StateSequenceConfig Defaults();
 };
+#ifdef NLOHMANN_JSON_VERSION_MAJOR
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(StateSequenceConfig,
+    SaveInterval
+);
+#endif
+
 class StateSequence {
 public:
     StateSequence(std::unique_ptr<INESEmulator>&& emulator,
@@ -258,10 +263,20 @@ struct StateSequenceThreadConfig {
     int NoWorkDelayMillis;
     int TryLockDelayMicros;
     int TryLockTries;
-    StateSequenceConfig StateSequenceConfig;
+    StateSequenceConfig StateSequenceCfg;
 
     static StateSequenceThreadConfig Defaults();
 };
+#ifdef NLOHMANN_JSON_VERSION_MAJOR
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(StateSequenceThreadConfig,
+    OnWorkDelayMillis,
+    NoWorkDelayMillis,
+    TryLockDelayMicros,
+    TryLockTries,
+    StateSequenceCfg
+);
+#endif
+
 class StateSequenceThread {
 public:
     StateSequenceThread(StateSequenceThreadConfig cfg,
