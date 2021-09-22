@@ -602,6 +602,47 @@ typedef RectBase<float> Rect2F;
 
 typedef std::array<Vector2F, 4> Quadrilateral2F;
 
+////////////////////////////////////////////////////////////////////////////////
+// JSON
+////////////////////////////////////////////////////////////////////////////////
+//
+// For a basic struct it is:
+// NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(typename, member1, member2...);
+
+#define JSONEXT_FROM_TO_CLASS(cname, fromfunc, tofunc)              \
+inline void to_json(nlohmann::json& j, const cname& c) {            \
+    j = c.tofunc();                                                 \
+}                                                                   \
+inline void from_json(const nlohmann::json& j, cname& c) {          \
+    c.fromfunc(j);                                                  \
+}
+
+// Example:
+//   enum class Friends {
+//    EDGAR,
+//    ARNIE,
+//   };
+//   NLOHMANN_JSON_SERIALIZE_ENUM(Friends, {
+//    {Friends::EDGAR, "edgar"},
+//    {Friends::ARNIE, "arnie"},
+//   })
+//   JSONEXT_SERIALIZE_ENUM_OPERATORS(Friends);
+//
+//  TODO add 'AllFriends' maybe?
+#define JSONEXT_SERIALIZE_ENUM_OPERATORS(etype)                     \
+inline std::ostream& operator<<(std::ostream& os, const etype& e) { \
+    nlohmann::json j = e;                                           \
+    os << std::string(j);                                           \
+    return os;                                                      \
+}                                                                   \
+inline std::istream& operator>>(std::istream& is, etype& e) {       \
+    std::string v;                                                  \
+    is >> v;                                                        \
+    nlohmann::json j = v;                                           \
+    e = j.get<etype>();                                             \
+    return is;                                                      \
+}
+
 }
 
 #endif

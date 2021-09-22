@@ -30,4 +30,7 @@ project(rgmutil)
 add_library(rgmutillib
     util.cpp
 )
+target_include_directories(rgmutillib PUBLIC
+    ${nlohmann_json_INCLUDE_DIRS}
+)
 

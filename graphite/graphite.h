@@ -91,6 +91,14 @@ enum class InputAction {
     SMB_JUMP_SHORTER,
     SMB_JUMP_LONGER,
 };
+NLOHMANN_JSON_SERIALIZE_ENUM(InputAction, {
+   {InputAction::SMB_JUMP_EARLIER, "smb_jump_earlier"},
+   {InputAction::SMB_JUMP_LATER, "smb_jump_later"},
+   {InputAction::SMB_JUMP, "smb_jump"},
+   {InputAction::SMB_JUMP_SHORTER, "smb_jump_shorter"},
+   {InputAction::SMB_JUMP_LONGER, "smb_jump_longer"},
+})
+JSONEXT_SERIALIZE_ENUM_OPERATORS(InputAction);
 
 struct InputsConfig {
     int ColumnPadding;
@@ -122,7 +130,8 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(InputsConfig,
     VisibleButtons,
     TextColor,
     HighlightTextColor,
-    ButtonColor
+    ButtonColor,
+    Hotkeys
 );
 
 

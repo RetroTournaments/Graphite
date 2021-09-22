@@ -71,9 +71,9 @@ bool graphite::ParseArgumentsToConfig(int* argc, char*** argv, const char* confi
             ifs >> j;
             try {
                 nlohmann::from_json(j, *config);
-                config->InesPath == "";
-                config->VideoPath == "";
-                config->FM2Path == "";
+                config->InesPath = "";
+                config->VideoPath = "";
+                config->FM2Path = "";
             } catch (nlohmann::detail::out_of_range e) {
                 spdlog::warn("incomplete config, maybe from previous version?");
                 *config = GraphiteConfig::Defaults();
