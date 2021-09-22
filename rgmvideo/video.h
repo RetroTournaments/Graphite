@@ -272,6 +272,7 @@ public:
 
     int64_t CurrentKnownNumFrames() const; // will change as the input is read.
     LiveInputFramePtr GetFrame(int frameIndex);
+    LiveInputFramePtr GetFramePts(int64_t pts);
 
     void UpdatePTS(std::vector<int64_t>* pts);
 

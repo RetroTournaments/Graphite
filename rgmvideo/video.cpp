@@ -664,6 +664,27 @@ LiveInputFramePtr StaticVideoThread::GetFrame(int frameIndex) {
     return nullptr;
 }
 
+LiveInputFramePtr StaticVideoThread::GetFramePts(int64_t pts) {
+    int targetFrame = 0;
+    {
+        std::lock_guard<std::mutex> lock(m_BufferMutex);
+        auto it = std::lower_bound(m_PTS.begin(), m_PTS.end(), pts);
+        if (it == m_PTS.end()) {
+            it--;
+        }
+        if (it != m_PTS.begin()) {
+            int64_t a = *it;
+            int64_t b = *std::prev(it);
+            if (std::abs(pts - b) < std::abs(pts - a)) {
+                it--;
+            }
+        }
+        targetFrame = std::distance(m_PTS.begin(), it);
+    }
+
+    return GetFrame(targetFrame);
+}
+
 void StaticVideoThread::UpdatePTS(std::vector<int64_t>* pts) {
     // TODO
     std::lock_guard<std::mutex> lock(m_BufferMutex);

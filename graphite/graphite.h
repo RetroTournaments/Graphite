@@ -80,6 +80,16 @@ private:
     rgms::nes::StateSequenceThread m_StateSequenceThread;
 };
 
+// TODO I would like the hotkeys / actions to be more general for each game.
+// If this were to be exposed / configurable there should be a better system..
+enum class InputAction {
+    SMB_JUMP_EARLIER,
+    SMB_JUMP_LATER,
+    SMB_JUMP,
+    SMB_JUMP_SHORTER,
+    SMB_JUMP_LONGER,
+};
+
 struct InputsConfig {
     int ColumnPadding;
     int ChevronColumnWidth;
@@ -94,6 +104,8 @@ struct InputsConfig {
     ImU32 TextColor;
     ImU32 HighlightTextColor;
     ImU32 ButtonColor;
+
+    std::vector<std::tuple<SDL_Scancode, bool, InputAction>> Hotkeys;
 
     static InputsConfig Defaults();
 };
@@ -184,13 +196,16 @@ private:
     void DoInputList(ImVec2 screenPos, int startIndex, int endIndex);
     void DoMainMenuBar();
 
-    void ChangeInputTo(int frameIndex, rgms::nes::ControllerState newInput);
+    void ChangeInputTo(int frameIndex, rgms::nes::ControllerState newInput, bool isDragging);
     void ChangeButtonTo(int frameIndex, uint8_t button, bool onoff);
     void ChangeTargetTo(int frameIndex, bool byChevronColumn);
     void ChangeAllInputsTo(const std::vector<rgms::nes::ControllerState>& inputs);
     ImU32 TextColor(bool highlighted);
     std::string ButtonText(uint8_t button);
 
+    void HandleHotkeys();
+    std::pair<int, int> FindPreviousJump();
+    void DoInputAction(InputAction actions);
 
 private:
     std::string OffsetLine() const;

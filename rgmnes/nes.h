@@ -134,6 +134,7 @@ public:
     // $4020 - $FFFF    Cartridge space (prg rom, prg ram, mapper registers)
     // #8000 - #FFFF    common rom
     virtual uint8_t CPUPeek(uint16_t address) const = 0;
+    virtual void CPUPeekMult(uint16_t address, uint16_t cnt, uint8_t* out) const;
     virtual void CPUPeekRam(Ram* ram) const;
 
     // PPU memory map
@@ -228,6 +229,10 @@ public:
     int GetCurrentIndex() const;
     std::string GetCurrentStateString() const;
 
+    // Modifies target, and does work until we have it.
+    std::string GetStateString(int frameIndex);
+    void SetEmu(int frameIndex, INESEmulator* emu);
+
 private:
     void SaveCurrentState();
 
@@ -273,6 +278,8 @@ public:
     // The latest is always available (might be 0 / empty)
     void GetLatestFrameIndex(int* frameIndex);
     void GetLatestState(std::string* state);
+
+    std::shared_ptr<std::string> GetState(int frameIndex); // may be null
 
 private:
     void SequenceThread();

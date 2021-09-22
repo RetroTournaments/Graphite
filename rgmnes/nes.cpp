@@ -114,6 +114,12 @@ void INESEmulator::CPUPeekRam(Ram* ram) const {
     }
 }
 
+void INESEmulator::CPUPeekMult(uint16_t address, uint16_t cnt, uint8_t* out) const {
+    for (uint16_t i = 0; i < cnt; i++) {
+        out[i] = CPUPeek(address + i);
+    }
+}
+
 void INESEmulator::PPUPeekPatternTable(int tableIndex, PatternTable* table) const {
     if (tableIndex < 0 || tableIndex > 1) {
         throw std::invalid_argument("invalid pattern table index");
@@ -269,7 +275,7 @@ void StateSequence::SetInput(int frameIndex, nes::ControllerState newState) {
 }
 
 bool StateSequence::HasWork() const {
-    if (m_CurrentIndex != m_TargetIndex) {
+    if (m_CurrentIndex < m_TargetIndex) {
         return true;
     }
     return false;
@@ -284,26 +290,23 @@ void StateSequence::SetTargetIndex(int targetIndex) {
         throw std::invalid_argument("invalid target index");
     }
     m_TargetIndex = targetIndex;
-    if (m_CurrentIndex > m_TargetIndex) {
-        if (m_TargetIndex == 0) {
-            m_CurrentIndex = 0;
-            m_SaveStates.resize(1);
-            m_Emulator->LoadStateString(m_SaveStates.front().StateString);
-        } else {
-            auto it = std::upper_bound(m_SaveStates.begin(), m_SaveStates.end(), targetIndex,
-                [&](int ti, const SaveState& ss){
-                    return ti < ss.Index;
-                });
 
-            if (it != m_SaveStates.begin()) {
+    if (m_TargetIndex == 0) {
+        m_CurrentIndex = 0;
+        m_Emulator->LoadStateString(m_SaveStates.front().StateString);
+    } else {
+        auto it = std::upper_bound(m_SaveStates.begin(), m_SaveStates.end(), targetIndex,
+            [&](int fi, const SaveState& ss){
+                return fi < ss.Index;
+            });
+        if (it != m_SaveStates.begin()) {
+            it = std::prev(it);
+            if (it != m_SaveStates.begin() && it->Index == targetIndex) {
                 it = std::prev(it);
-                if (it != m_SaveStates.begin() && it->Index == targetIndex) {
-                    it = std::prev(it);
-                }
             }
-            m_SaveStates.erase(std::next(it), m_SaveStates.end());
+        }
 
-
+        if (m_TargetIndex < m_CurrentIndex || m_CurrentIndex < it->Index) {
             m_CurrentIndex = it->Index;
             m_Emulator->LoadStateString(it->StateString);
         }
@@ -333,10 +336,24 @@ void StateSequence::DoWork() {
         m_Emulator->Execute(GetInput(m_CurrentIndex));
         m_CurrentIndex++;
 
-        if (m_CurrentIndex % m_Config.SaveInterval == 0) {
+        if (m_CurrentIndex % m_Config.SaveInterval == 0 &&
+                m_CurrentIndex > m_SaveStates.back().Index) {
             SaveCurrentState();
         }
     }
+}
+
+std::string StateSequence::GetStateString(int frameIndex) {
+    SetTargetIndex(frameIndex);
+    while (HasWork()) {
+        DoWork();
+    }
+    assert(GetCurrentIndex() == frameIndex);
+    return GetCurrentStateString();
+}
+
+void StateSequence::SetEmu(int frameIndex, INESEmulator* emu) {
+    emu->LoadStateString(GetStateString(frameIndex));
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -390,6 +407,17 @@ void StateSequenceThread::GetLatestState(std::string* state) {
         std::lock_guard<std::mutex> lock(m_LatestMutex);
         *state = m_LatestState;
     }
+}
+
+std::shared_ptr<std::string> StateSequenceThread::GetState(int frameIndex) {
+    TargetChange(frameIndex);
+    if (m_LatestIndex == frameIndex) {
+        std::lock_guard<std::mutex> lock(m_LatestMutex);
+        if (m_LatestState.size() != 0) {
+            return std::make_shared<std::string>(m_LatestState);
+        }
+    }
+    return nullptr;
 }
 
 bool StateSequenceThread::HasNewState(int* frameIndex, std::string* state) {

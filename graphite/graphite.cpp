@@ -245,6 +245,14 @@ InputsConfig InputsConfig::Defaults() {
     cfg.ButtonColor = IM_COL32(215, 25, 25, 255);
     cfg.StickyAutoScroll = true;
 
+    cfg.Hotkeys = {
+        {SDL_SCANCODE_1, true, InputAction::SMB_JUMP_EARLIER},
+        {SDL_SCANCODE_2, true, InputAction::SMB_JUMP_LATER},
+        {SDL_SCANCODE_3, true, InputAction::SMB_JUMP},
+        {SDL_SCANCODE_4, true, InputAction::SMB_JUMP_SHORTER},
+        {SDL_SCANCODE_5, true, InputAction::SMB_JUMP_LONGER},
+    };
+
     return cfg;
 }
 
@@ -304,6 +312,18 @@ static bool StringStartsWith(const std::string& str, const std::string& start) {
         return str.compare(0, start.length(), start) == 0;
     }
     return false;
+}
+
+void InputsComponent::HandleHotkeys() {
+    auto& io = ImGui::GetIO();
+    int dx = 0;
+    if (!io.WantCaptureKeyboard) {
+        for (auto & [sc, repeat, action] : m_Config->Hotkeys) {
+            if (ImGui::IsKeyPressed(sc, repeat)) {
+                DoInputAction(action);
+            }
+        }
+    }
 }
 
 void InputsComponent::TryReadFM2() {
@@ -457,10 +477,9 @@ void InputsComponent::DoInputLine(int frameIndex) {
         }
         for (int i = s; i <= e; i++) {
             if (m_Drag.Button == 0) {
-                ChangeInputTo(i, m_Drag.HLButtons);
+                ChangeInputTo(i, m_Drag.HLButtons, true);
             } else {
                 if (m_Drag.HighlightedFrames.size() > 1) {
-                    //ChangeButtonTo(m_Drag.StartFrameIndex, m_Drag.HLButtons, !m_Drag.StartedOn);
                     ChangeButtonTo(i, m_Drag.HLButtons, !m_Drag.StartedOn);
                 } else {
                     if ((e - s) > 0) {
@@ -581,7 +600,7 @@ void InputsComponent::DoInputLine(int frameIndex) {
                         thisInput |= button;
                     }
 
-                    ChangeInputTo(frameIndex, thisInput);
+                    ChangeInputTo(frameIndex, thisInput, true);
                 }
             }
         }
@@ -605,7 +624,7 @@ void InputsComponent::DoInputLine(int frameIndex) {
     }
     if (ImGui::BeginPopup("frame_popup")) {
         if (ImGui::MenuItem(fmt::format("clear {}", frameIndex + 1).c_str())) {
-            ChangeInputTo(frameIndex, 0x00);
+            ChangeInputTo(frameIndex, 0x00, false);
         }
         if (ImGui::MenuItem(fmt::format("insert before {}", frameIndex + 1).c_str())) {
             if (frameIndex < m_Inputs.size()) {
@@ -630,6 +649,74 @@ void InputsComponent::DoInputLine(int frameIndex) {
     ImGui::PopID();
 }
 
+std::pair<int, int> InputsComponent::FindPreviousJump() {
+    bool foundEnd = false;
+    int start = 0;
+    int end = 0;
+    for (int i = m_TargetIndex; i >= 0; i--) {
+        if (!foundEnd && m_Inputs[i] & nes::Button::A) {
+            end = i;
+            foundEnd = true;
+        } else if (foundEnd && !(m_Inputs[i] & nes::Button::A)) {
+            start = i + 1;
+            break;
+        }
+    }
+    if (foundEnd) {
+        while (end < (m_Inputs.size()) && m_Inputs[end] & nes::Button::A) {
+            end++;
+        }
+    }
+    return std::make_pair(start, end);
+}
+
+
+void InputsComponent::DoInputAction(InputAction action) {
+    switch(action) {
+        case InputAction::SMB_JUMP_EARLIER: {
+            auto [from, to] = FindPreviousJump();
+            if (from != to && from > 0) {
+                m_UndoRedo.ChangeInputTo(from - 1, m_Inputs[from - 1] | nes::Button::A);
+            }
+            break; 
+        }
+        case InputAction::SMB_JUMP_LATER: {
+            auto [from, to] = FindPreviousJump();
+            if (from != to) {
+                m_UndoRedo.ChangeInputTo(from, m_Inputs[from] & ~nes::Button::A);
+            }
+            break;
+        }
+        case InputAction::SMB_JUMP: {
+            if (m_TargetIndex >= 2) {
+                if (m_Inputs[m_TargetIndex - 2] & nes::Button::A) {
+                    auto [from, to] = FindPreviousJump();
+                    m_UndoRedo.ChangeInputTo(to, m_Inputs[to] | nes::Button::A);
+                } else {
+                    m_UndoRedo.ChangeInputTo(m_TargetIndex - 2, m_Inputs[m_TargetIndex - 2] | nes::Button::A);
+                }
+            }
+            break;
+        }
+        case InputAction::SMB_JUMP_SHORTER: {
+            auto [from, to] = FindPreviousJump();
+            if (from != to && to > 0) {
+                m_UndoRedo.ChangeInputTo(to - 1, m_Inputs[to - 1] & ~nes::Button::A);
+            }
+            break;
+        }
+        case InputAction::SMB_JUMP_LONGER: {
+            auto [from, to] = FindPreviousJump();
+            if (from != to) {
+                m_UndoRedo.ChangeInputTo(to, m_Inputs[to] | nes::Button::A);
+            }
+            break;
+        }
+        default:
+            throw std::runtime_error("unhandled action!");
+    }
+}
+
 void InputsComponent::ChangeAllInputsTo(const std::vector<rgms::nes::ControllerState>& inputs) {
     int numChanges = 0;
     for (size_t i = inputs.size(); i < m_Inputs.size(); i++) {
@@ -652,13 +739,17 @@ void InputsComponent::ChangeAllInputsTo(const std::vector<rgms::nes::ControllerS
     }
 }
 
-void InputsComponent::ChangeInputTo(int frameIndex, nes::ControllerState newState) {
+void InputsComponent::ChangeInputTo(int frameIndex, nes::ControllerState newState, bool isDragging) {
     if (m_LockTarget == -1) {
         ChangeTargetTo(frameIndex, false);
     }
-    if (m_Drag.HighlightedFrames.find(frameIndex) == m_Drag.HighlightedFrames.end()) {
+    if (isDragging) {
+        if (m_Drag.HighlightedFrames.find(frameIndex) == m_Drag.HighlightedFrames.end()) {
+            m_UndoRedo.ChangeInputTo(frameIndex, newState);
+            m_Drag.HighlightedFrames.insert(frameIndex);
+        }
+    } else {
         m_UndoRedo.ChangeInputTo(frameIndex, newState);
-        m_Drag.HighlightedFrames.insert(frameIndex);
     }
 }
 void InputsComponent::ChangeButtonTo(int frameIndex, uint8_t button, bool onoff) {
@@ -668,7 +759,7 @@ void InputsComponent::ChangeButtonTo(int frameIndex, uint8_t button, bool onoff)
     } else {
         input &= ~button;
     }
-    ChangeInputTo(frameIndex, input);
+    ChangeInputTo(frameIndex, input, true);
 }
 
 void InputsComponent::DoInputList(ImVec2 p, int startIndex, int endIndex) {
@@ -734,6 +825,7 @@ void InputsComponent::DoMainMenuBar() {
 }
 
 void InputsComponent::OnFrame() {
+    HandleHotkeys();
     DoMainMenuBar();
 
     if (ImGui::Begin(WindowName().c_str())) {

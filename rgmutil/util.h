@@ -74,6 +74,17 @@ std::string SimpleDurationFormat(const mclock::duration& duration, SimpleTimeFor
 std::string SimpleMillisFormat(int64_t millis, SimpleTimeFormatFlags flags);
 
 ////////////////////////////////////////////////////////////////////////////////
+// Bitmanip
+////////////////////////////////////////////////////////////////////////////////
+inline uint8_t Reverse(uint8_t b) {
+    // https://stackoverflow.com/a/2602885
+    b = (b & 0xF0) >> 4 | (b & 0x0F) << 4;
+    b = (b & 0xCC) >> 2 | (b & 0x33) << 2;
+    b = (b & 0xAA) >> 1 | (b & 0x55) << 1;
+    return b;
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // Linspace
 //
 // std::vector<float> arr(100);

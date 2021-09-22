@@ -43,6 +43,7 @@
 #include "SDL.h" 
 #include "imgui.h"
 #include "opencv2/opencv.hpp"
+#include "fmt/core.h"
 
 #include "rgmutil/util.h"
 
@@ -186,6 +187,11 @@ bool ArrowKeyHelperInFrame(int* dx, int* dy, int shiftMultiplier);
 // Favorite is : ImGuiInputTextFlags_EnterReturnsTrue
 bool InputText(const char* label, std::string* str, 
         ImGuiInputTextFlags flags = ImGuiInputTextFlags_None);
+
+template <typename... T>
+void TextFmt(fmt::format_string<T...> fmt, T&&... args) {
+    ImGui::TextUnformatted(fmt::format(fmt, args...).c_str());
+}
 
 // When hovered these sliders adjust the values based on arrow keys / mouse
 // wheels
