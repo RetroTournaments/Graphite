@@ -22,6 +22,7 @@
 
 #include <cmath>
 #include <sstream>
+#include <fstream>
 #include <iomanip>
 
 #include "rgmutil/util.h"
@@ -212,3 +213,59 @@ BezierPatch rgms::util::RectanglePatch(Vector2F origin, Vector2F size) {
     return p;
 }
 
+////////////////////////////////////////////////////////////////////////////////
+
+bool rgms::util::StringEndsWith(const std::string& str, const std::string& ending) {
+    if (str.length() >= ending.length()) {
+        return str.compare(str.length() - ending.length(), ending.length(), ending) == 0;
+    } 
+    return false;
+}
+
+bool rgms::util::StringStartsWith(const std::string& str, const std::string& start) {
+    if (str.length() >= start.length()) {
+        return str.compare(0, start.length(), start) == 0;
+    }
+    return false;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+void rgms::util::ForFileInDirectory(const std::string& directory,
+        std::function<bool(fs::path p)> cback) {
+    for (const auto & entry : fs::directory_iterator(directory)) {
+        if (!cback(entry.path())) {
+            return;
+        }
+    }
+}
+
+void rgms::util::ForFileOfExtensionInDirectory(const std::string& directory,
+        const std::string& extension, std::function<bool(fs::path p)> cback) {
+    for (const auto & entry : fs::directory_iterator(directory)) {
+        if (entry.path().extension().string() == extension) {
+            if (!cback(entry.path())) {
+                return;
+            }
+        }
+    }
+}
+
+int rgms::util::ReadFileToVector(const std::string& path, std::vector<uint8_t>* contents) {
+    std::ifstream ifs(path, std::ios::in | std::ios::binary);
+    if (!ifs.good()) {
+        throw std::invalid_argument("ifstream not good");
+    }
+    *contents = std::move(std::vector<uint8_t>(
+            std::istreambuf_iterator<char>(ifs), 
+            std::istreambuf_iterator<char>()));
+    return static_cast<int>(contents->size());
+}
+
+void rgms::util::WriteVectorToFile(const std::string& path, const std::vector<uint8_t>& contents) {
+    std::ofstream ofs(path, std::ios::out | std::ios::binary);
+    if (!ofs.good()) {
+        throw std::invalid_argument("ofstream not good");
+    }
+    ofs.write(reinterpret_cast<const char*>(contents.data()), contents.size());
+}

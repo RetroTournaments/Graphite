@@ -22,7 +22,13 @@
 cmake_minimum_required(VERSION 3.6)
 project(rgmvideo)
 
-if (UNIX)
+if(WIN32)
+    if (NOT DEFINED OpenCV_DIR)
+        message(FATAL_ERROR "You must specify OpenCV_DIR")
+    endif()
+    find_package(OpenCV CONFIG REQUIRED)
+else()
+    find_package(OpenCV REQUIRED)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-anon-enum-enum-conversion")
 endif()
 

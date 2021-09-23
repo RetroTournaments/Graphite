@@ -22,6 +22,16 @@
 cmake_minimum_required(VERSION 3.6)
 project(rgmui)
 
+if(WIN32)
+    if (NOT DEFINED OpenCV_DIR)
+        message(FATAL_ERROR "You must specify OpenCV_DIR")
+    endif()
+    find_package(OpenCV CONFIG REQUIRED)
+    find_package(OpenGL REQUIRED)
+else()
+    find_package(OpenCV REQUIRED)
+endif()
+
 ################################################################################
 # RGMUI Lib
 #   - Library with useful utilities for creating my style of user interfaces

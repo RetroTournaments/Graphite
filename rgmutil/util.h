@@ -34,6 +34,9 @@
 #include <string>
 #include <array>
 #include <cmath>
+#include <functional>
+#define _SILENCE_EXPERIMENTAL_FILESYSTEM_DEPRECATION_WARNING
+#include <experimental/filesystem>
 
 namespace rgms::util {
 
@@ -605,7 +608,7 @@ typedef std::array<Vector2F, 4> Quadrilateral2F;
 ////////////////////////////////////////////////////////////////////////////////
 // JSON
 ////////////////////////////////////////////////////////////////////////////////
-//
+
 // For a basic struct it is:
 // NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(typename, member1, member2...);
 
@@ -642,6 +645,28 @@ inline std::istream& operator>>(std::istream& is, etype& e) {       \
     e = j.get<etype>();                                             \
     return is;                                                      \
 }
+
+////////////////////////////////////////////////////////////////////////////////
+// File system
+////////////////////////////////////////////////////////////////////////////////
+namespace fs = std::experimental::filesystem;
+
+void ForFileInDirectory(const std::string& directory,
+        std::function<bool(fs::path p)> cback);
+// Include "." so: ".png"
+void ForFileOfExtensionInDirectory(const std::string& directory,
+        const std::string& extension,
+        std::function<bool(fs::path p)> cback);
+
+int ReadFileToVector(const std::string& path, std::vector<uint8_t>* contents);
+void WriteVectorToFile(const std::string& path, const std::vector<uint8_t>& contents);
+
+
+////////////////////////////////////////////////////////////////////////////////
+// Strings
+////////////////////////////////////////////////////////////////////////////////
+bool StringEndsWith(const std::string& str, const std::string& ending);
+bool StringStartsWith(const std::string& str, const std::string& start);
 
 }
 
