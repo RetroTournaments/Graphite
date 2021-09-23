@@ -21,10 +21,13 @@
 ################################################################################
 cmake_minimum_required(VERSION 3.6)
 cmake_policy(SET CMP0012 NEW)
+cmake_policy(SET CMP0077 NEW)
 
 project(Graphite)
 
-if (WIN32)
+option(GRAPHITE_RGMS_ONLY "Build only the RGMS libraries" OFF)
+
+if(WIN32)
     find_package(OpenGL REQUIRED)
     if (NOT DEFINED OpenCV_DIR)
         message(FATAL_ERROR "You must specify OpenCV_DIR")
@@ -45,6 +48,8 @@ add_subdirectory(rgmui)
 add_subdirectory(rgmnes)
 add_subdirectory(rgmvideo)
 
-add_subdirectory(graphite)
-add_subdirectory(carbon)
+if(NOT GRAPHITE_RGMS_ONLY)
+    add_subdirectory(graphite)
+    add_subdirectory(carbon)
+endif()
 
