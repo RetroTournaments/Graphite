@@ -39,8 +39,8 @@ FilterConfig FilterConfig::Defaults() {
     cfg.Crop = util::Rect2F(0, 0, w, h);
     cfg.Quad[0] = {0.0f, 0.0f};
     cfg.Quad[1] = {w, 0.0f};
-    cfg.Quad[2] = {w, h};
-    cfg.Quad[3] = {0.0f, h};
+    cfg.Quad[2] = {0.0f, h};
+    cfg.Quad[3] = {w, h};
     cfg.Patch = util::RectanglePatch({0, 0}, {w, h});
     return cfg;
 }
@@ -57,8 +57,13 @@ cv::Mat carbon::GetFilterPerspectiveMatrix(int width, int height, const FilterCo
     cv::Point2f outquad[4];
     outquad[0] = cv::Point2f(0.0f, 0.0f);
     outquad[1] = cv::Point2f(w, 0.0f);
-    outquad[2] = cv::Point2f(w, h);
-    outquad[3] = cv::Point2f(0.0f, h);
+    outquad[2] = cv::Point2f(0.0f, h);
+    outquad[3] = cv::Point2f(w, h);
+
+    // Account for the difference between ffmpeg (which is how data is stored /
+    // input), and opencv (which is currently being used for the live preview.
+    std::swap(inquad[2], inquad[3]);
+    std::swap(outquad[2], outquad[3]);
 
     return cv::getPerspectiveTransform(inquad, outquad);
 }
@@ -501,10 +506,10 @@ void CarbonApp::DrawFilterAnnotations(rgms::rgmui::MatAnnotator* mat,
             mat->AddLine(util::Vector2F(vec[i].x, vec[i].y), util::Vector2F(vec[j].x, vec[j].y), col);
         }
 
-        for (int i = 0; i < 4; i++) {
-            int j = (i + 1) % 4;
-            mat->AddLine(filter.Quad[i], filter.Quad[j], col2, 1);
-        }
+        mat->AddLine(filter.Quad[0], filter.Quad[1], col2, 1);
+        mat->AddLine(filter.Quad[1], filter.Quad[3], col2, 1);
+        mat->AddLine(filter.Quad[3], filter.Quad[2], col2, 1);
+        mat->AddLine(filter.Quad[0], filter.Quad[2], col2, 1);
     } else if (filter.Type == FilterType::UNCRT) {
         auto& patch = filter.Patch;
 
@@ -648,23 +653,31 @@ void CarbonApp::SetupHandles() {
         if (m_QuadHandlesActive) {
             ImU32 c = IM_COL32(0, 255, 0, 255);
             std::vector<util::Vector2F*> apts;
-            for (int i = 0; i < 4; i++) {
+
+            std::vector<std::tuple<int, int, int>> QUAD_SEGMENTS = {
+                {0, 1, 1}, {3, 2, 1}, {1, 3, 0}, {2, 0, 0}
+            };
+
+            for (auto & [i, j, ox] : QUAD_SEGMENTS) {
                 m_Handles.push_back(std::make_shared<PointsHandle>(&filter.Quad[i], c, HandleSize(1, 1)));
+
+                int oy = (1 + ox) % 2;
+
                 std::vector<util::Vector2F*> pts = {
                     &filter.Quad[i],
-                    &filter.Quad[(i + 1) % 4]
+                    &filter.Quad[j]
                 };
                 m_Handles.push_back(std::make_shared<PointsHandle>(pts, c, 
-                            HandleSize(1 + ((i + 1) % 2), 1 + (i % 2))));
+                            HandleSize(1 + ox, 1 + oy)));
                 apts.push_back(&filter.Quad[i]);
             }
             m_Handles.push_back(std::make_shared<PointsHandle>(apts, c, HandleSize(2, 2)));
 
-            // just whatever dude
+            // To align handles with crop handles for hotkey purposes
             std::swap(m_Handles[4], m_Handles[1]);
-            std::swap(m_Handles[2], m_Handles[1]);
             std::swap(m_Handles[6], m_Handles[7]);
             std::swap(m_Handles[3], m_Handles[7]);
+            std::swap(m_Handles[7], m_Handles[5]);
 
         } else {
             cv::Mat m = GetFilterPerspectiveMatrix(m_LiveInputFrame->Width, m_LiveInputFrame->Height,
