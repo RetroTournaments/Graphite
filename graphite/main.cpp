@@ -32,10 +32,16 @@ const char* CONFIG_FILE = "graphite.json";
 
 void UpdateDefaultsForScreenSize(GraphiteConfig* config) {
     SDL_DisplayMode displayMode;
-    std::cout << "hello!" << std::endl;
     if (SDL_GetCurrentDisplayMode(0, &displayMode) == 0) {
-        std::cout << displayMode.w;
-        std::cout << displayMode.h;
+        if (displayMode.w < 1920 || displayMode.h < 1060) {
+            config->WindowCfg.WindowWidth = 1440;
+            config->WindowCfg.WindowHeight = 810;
+            config->WindowCfg.InputSplitLeft = 0.242f;
+            config->WindowCfg.LowerSplitDownLeft = 0.30f;
+            config->WindowCfg.LowerSplitDownRight = 0.293f;
+            config->EmuViewCfg.ScreenPeekCfg.ScreenMultiplier = 2;
+            config->VideoCfg.ScreenMultiplier = 2;
+        }
     }
 }
 
@@ -60,7 +66,7 @@ int main(int argc, char** argv) {
             useConfigApp = true;
         }
 
-        rgmui::Window window(config.WindowWidth, config.WindowHeight, "Graphite");
+        rgmui::Window window(config.WindowCfg.WindowWidth, config.WindowCfg.WindowHeight, "Graphite");
         spdlog::info("window created");
         ImGuiIO& io = ImGui::GetIO();
         io.IniFilename = NULL; 
@@ -88,8 +94,8 @@ int main(int argc, char** argv) {
 
             if (config.SaveConfig) {
                 config.ImguiIniSettings = std::string(ImGui::SaveIniSettingsToMemory());
-                config.WindowWidth = window.ScreenWidth();
-                config.WindowHeight = window.ScreenHeight();
+                config.WindowCfg.WindowWidth = window.ScreenWidth();
+                config.WindowCfg.WindowHeight = window.ScreenHeight();
 
                 std::ofstream of("graphite.json");
                 of << std::setw(2) << nlohmann::json(config) << std::endl;

@@ -481,14 +481,30 @@ private:
 ////////////////////////////////////////////////////////////////////////////////
 // Graphite Config
 ////////////////////////////////////////////////////////////////////////////////
+struct WindowConfig {
+    int WindowWidth;
+    int WindowHeight;
+    float InputSplitLeft;
+    float LowerSplitDownLeft;
+    float LowerSplitDownRight;
+
+    static WindowConfig Defaults();
+};
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(WindowConfig,
+    WindowWidth,
+    WindowHeight,
+    InputSplitLeft,
+    LowerSplitDownLeft,
+    LowerSplitDownRight
+);
+
 struct GraphiteConfig {
     std::string InesPath;
     std::string VideoPath;
     std::string FM2Path;
     bool SaveConfig;
 
-    int WindowWidth;
-    int WindowHeight;
+    WindowConfig WindowCfg;
     std::string ImguiIniSettings;
 
     InputsConfig InputsCfg;
@@ -502,8 +518,7 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(GraphiteConfig,
     VideoPath,
     FM2Path,
     SaveConfig,
-    WindowWidth,
-    WindowHeight,
+    WindowCfg,
     ImguiIniSettings,
     InputsCfg,
     EmuViewCfg,

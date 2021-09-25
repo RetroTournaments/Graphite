@@ -37,12 +37,21 @@ namespace fs = std::experimental::filesystem;
 
 using namespace graphite;
 using namespace rgms;
+WindowConfig WindowConfig::Defaults() {
+    WindowConfig config;
+    config.WindowWidth = 1920;
+    config.WindowHeight = 1060;
+    config.InputSplitLeft = 0.18f;
+    config.LowerSplitDownLeft = 0.25f;
+    config.LowerSplitDownRight = 0.245f;
+    return config;
+}
 
 GraphiteConfig GraphiteConfig::Defaults() {
     GraphiteConfig config;
     config.SaveConfig = true;
-    config.WindowWidth = 1920;
-    config.WindowHeight = 1080;
+
+    config.WindowCfg = WindowConfig::Defaults();
     config.InputsCfg = InputsConfig::Defaults();
     config.EmuViewCfg = EmuViewConfig::Defaults();
     config.VideoCfg = VideoConfig::Defaults();
@@ -125,14 +134,10 @@ void GraphiteApp::SetupDockSpace() {
     ImGui::DockBuilderAddNode(dockspaceId, ImGuiDockNodeFlags_DockSpace);
     ImGui::DockBuilderSetNodeSize(dockspaceId, viewport->Size);
 
-    ImGuiID inputNode = ImGui::DockBuilderSplitNode(dockspaceId, ImGuiDir_Left, 0.18f, nullptr, &dockspaceId);
+    ImGuiID inputNode = ImGui::DockBuilderSplitNode(dockspaceId, ImGuiDir_Left, m_Config->WindowCfg.InputSplitLeft, nullptr, &dockspaceId);
     ImGuiID screenNode = ImGui::DockBuilderSplitNode(dockspaceId, ImGuiDir_Left, 0.5f, nullptr, &dockspaceId);
-    ImGuiID playbackNode = ImGui::DockBuilderSplitNode(dockspaceId, ImGuiDir_Down, 0.245f, nullptr, &dockspaceId);
-    ImGuiID emuNode = ImGui::DockBuilderSplitNode(screenNode, ImGuiDir_Down, 0.25f, nullptr, &screenNode);
-
-    //ImGui::DockBuilderSetNodeSize(playbackNode, {-1, 0.25f * viewport->Size.y});
-    //ImGui::DockBuilderSetNodeSize(emuNode, {-1, 0.25f * viewport->Size.y});
-
+    ImGuiID playbackNode = ImGui::DockBuilderSplitNode(dockspaceId, ImGuiDir_Down, m_Config->WindowCfg.LowerSplitDownRight, nullptr, &dockspaceId);
+    ImGuiID emuNode = ImGui::DockBuilderSplitNode(screenNode, ImGuiDir_Down,m_Config->WindowCfg.LowerSplitDownLeft, nullptr, &screenNode);
 
     ImGui::DockBuilderDockWindow(InputsComponent::WindowName().c_str(), inputNode);
     ImGui::DockBuilderDockWindow(ScreenPeekSubComponent::WindowName().c_str(), screenNode);
