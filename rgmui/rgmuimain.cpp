@@ -49,14 +49,17 @@ void rgms::rgmui::RedirectIO() {
 #endif
 }
 
+void rgms::rgmui::LogAndDisplayException(const std::string& s) {
+    spdlog::error(s);
+    std::cerr << s << std::endl;
+#ifdef _WIN32
+    MessageBox(NULL, s.c_str(), NULL, 0x00000030L);
+#endif
+}
+
 void rgms::rgmui::LogAndDisplayException(const std::exception& e) {
     std::string error = fmt::format("uncaught exception: '{}'", e.what());
-
-    spdlog::error(error);
-    std::cerr << error << std::endl;
-#ifdef _WIN32
-    MessageBox(NULL, error.c_str(), NULL, 0x00000030L);
-#endif
+    LogAndDisplayException(error);
 }
 
 void rgms::rgmui::WindowAppMainLoop(

@@ -43,6 +43,7 @@ namespace rgms::rgmui {
 
 void InitializeDefaultLogger(const std::string& name);
 void RedirectIO(); // only does stuff on windows
+void LogAndDisplayException(const std::string& s);
 void LogAndDisplayException(const std::exception& e);
 void WindowAppMainLoop(
     Window* window, IApplication* application,

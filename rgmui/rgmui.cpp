@@ -40,8 +40,10 @@ Window::Window(int winsizex, int winsizey, const std::string& name)
     : m_Window(nullptr)
     , m_Context(nullptr) 
 {
-    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
-        throw std::runtime_error(SDL_GetError());
+    if (SDL_WasInit(SDL_INIT_VIDEO) == 0) {
+        if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+            throw std::runtime_error(SDL_GetError());
+        }
     }
     m_Window = SDL_CreateWindow(
         name.c_str(), 
@@ -51,6 +53,9 @@ Window::Window(int winsizex, int winsizey, const std::string& name)
         winsizey, 
         SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE
     );
+    if (m_Window == nullptr) {
+        throw std::runtime_error(SDL_GetError());
+    }
 
     m_Context = SDL_GL_CreateContext(m_Window);
     if (m_Context == nullptr) {

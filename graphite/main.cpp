@@ -23,11 +23,21 @@
 
 #include "rgmui/rgmuimain.h"
 #include "graphite/graphite.h"
+#include "rgmnes/nestopiaimpl.h"
 
 using namespace graphite;
 using namespace rgms;
 
 const char* CONFIG_FILE = "graphite.json";
+
+void UpdateDefaultsForScreenSize(GraphiteConfig* config) {
+    SDL_DisplayMode displayMode;
+    std::cout << "hello!" << std::endl;
+    if (SDL_GetCurrentDisplayMode(0, &displayMode) == 0) {
+        std::cout << displayMode.w;
+        std::cout << displayMode.h;
+    }
+}
 
 int main(int argc, char** argv) {
     util::ArgNext(&argc, &argv); // Skip path argument
@@ -37,7 +47,13 @@ int main(int argc, char** argv) {
         rgmui::InitializeDefaultLogger("graphite");
         spdlog::info("program started");
 
+        if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+            throw std::runtime_error(SDL_GetError());
+        }
+
         GraphiteConfig config = GraphiteConfig::Defaults();
+        UpdateDefaultsForScreenSize(&config);
+
         bool useConfigApp = false;
         if (!ParseArgumentsToConfig(&argc, &argv, CONFIG_FILE, &config)) {
             spdlog::warn("did not parse command line arguments");
@@ -83,6 +99,21 @@ int main(int argc, char** argv) {
 
     } catch(const std::exception& e) {
         rgmui::LogAndDisplayException(e);
+        ret = 1;
+    } catch (const std::string& s) {
+        rgmui::LogAndDisplayException(fmt::format("uncaught string: '{}'", s));
+        ret = 1;
+    } catch (const char* s) {
+        rgmui::LogAndDisplayException(fmt::format("uncaught string: '{}'", s));
+        ret = 1;
+    } catch (Nes::Result r) {
+        rgmui::LogAndDisplayException(fmt::format("uncaught Nes::Result '{}'", rgms::nes::ResultToString(r)));
+        ret = 1;
+    } catch (int v) {
+        rgmui::LogAndDisplayException(fmt::format("uncaught int '{}'", v));
+        ret = 1;
+    } catch (...) {
+        rgmui::LogAndDisplayException("uncaught something else. :(");
         ret = 1;
     }
     spdlog::info("program ended");
