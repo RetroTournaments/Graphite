@@ -58,6 +58,8 @@ enum EventType : int {
     OFFSET_SET_TO, // int
     SET_OFFSET_TO, // int
 
+    SUSPEND_FRAME_ADVANCE, // int
+
     REQUEST_SAVE,
     REFRESH_CONFIG,
 };
@@ -195,7 +197,7 @@ private:
         void UpdateScroll();
 
         void SuspendAutoScroll();
-        void OnTargetChange(bool byChevronColumn);
+        void OnTargetChange(bool byUserInteraction);
 
     private:
         void SetScrollDirectTo(int target);
@@ -213,6 +215,38 @@ private:
         float m_VisibleY;
     };
 
+    class DragInputChanger {
+    public:
+        DragInputChanger(InputsComponent* inputs);
+        ~DragInputChanger();
+
+        bool IsDragging() const;
+        bool InDragList(int frameIndex) const;
+        bool HasDragged() const;
+        uint8_t HLButtons() const;
+        uint8_t Button() const;
+
+        void StartDrag(int frameIndex, uint8_t button, uint8_t hlButtons, bool on);
+        void DragTo(int frameIndex);
+        void EndDrag();
+
+        void Clear();
+
+    private:
+        void DragMakeChange(int frameIndex);
+
+    private:
+        InputsComponent* m_InputsComponent;
+
+        bool m_IsDragging;
+        int m_StartFrameIndex;
+        int m_EndFrameIndex;
+
+        uint8_t m_Button; // 0x00 on frame
+        uint8_t m_HLButtons;
+        bool m_StartedOn;
+    };
+
 private:
     std::string FrameText(int frameId) const;
     ImVec2 CalcLineSize();
@@ -221,9 +255,9 @@ private:
     void DoInputList(ImVec2 screenPos, int startIndex, int endIndex);
     void DoMainMenuBar();
 
-    void ChangeInputTo(int frameIndex, rgms::nes::ControllerState newInput, bool isDragging);
+    void ChangeInputTo(int frameIndex, rgms::nes::ControllerState newInput);
     void ChangeButtonTo(int frameIndex, uint8_t button, bool onoff);
-    void ChangeTargetTo(int frameIndex, bool byChevronColumn);
+    void ChangeTargetTo(int frameIndex, bool byUserInteraction);
     void ChangeAllInputsTo(const std::vector<rgms::nes::ControllerState>& inputs);
     ImU32 TextColor(bool highlighted);
     std::string ButtonText(uint8_t button);
@@ -245,6 +279,7 @@ private:
 private:
     rgms::rgmui::EventQueue* m_EventQueue;
     TargetScroller m_TargetScroller;
+    DragInputChanger m_DragInputChanger;
 
     ImVec2 m_LineSize;
     std::vector<int> m_ColumnX;
@@ -253,19 +288,6 @@ private:
     bool m_TargetDragging;
     bool m_CouldToggleLock;
     int m_LockTarget;
-
-    struct DragInfo {
-        bool IsDragging;
-        int StartFrameIndex;
-        uint8_t Button; // 0x00 on frame
-        uint8_t HLButtons;
-        bool StartedOn;
-        std::unordered_set<int> HighlightedFrames;
-        int LastHighlighted;
-
-        void StartDrag(int frameIndex, uint8_t button, uint8_t hlButtons, bool on);
-        void Clear();
-    } m_Drag;
 
     InputsConfig* m_Config;
     UndoRedo m_UndoRedo;
@@ -474,6 +496,7 @@ private:
     rgms::rgmui::EventQueue* m_EventQueue;
     float m_PlaybackSpeed;
     bool m_IsPlaying;
+    bool m_SuspendFrameAdvance;
     rgms::util::mclock::time_point m_LastTime;
     rgms::util::mclock::duration m_Accumulator;
 };

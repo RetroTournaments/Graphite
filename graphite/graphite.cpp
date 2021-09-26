@@ -37,6 +37,7 @@ namespace fs = std::experimental::filesystem;
 
 using namespace graphite;
 using namespace rgms;
+
 WindowConfig WindowConfig::Defaults() {
     WindowConfig config;
     config.WindowWidth = 1920;
@@ -105,6 +106,34 @@ bool graphite::ParseArgumentsToConfig(int* argc, char*** argv, const char* confi
     }
     return false;
 }
+
+static int KeyPressedFrameAdvance() {
+    int dx = 0;
+
+    if (ImGui::IsKeyPressed(SDL_SCANCODE_LEFT)) {
+        dx = -1;
+    } else if (ImGui::IsKeyPressed(SDL_SCANCODE_RIGHT)) {
+        dx =  1;
+    } else if (ImGui::IsKeyPressed(SDL_SCANCODE_BACKSPACE)) {
+        dx = -1;
+    } else if (ImGui::IsKeyPressed(SDL_SCANCODE_BACKSLASH)) {
+        dx =  1;
+    } else if (ImGui::IsKeyPressed(SDL_SCANCODE_UP)) {
+        dx = -8;
+    } else if (ImGui::IsKeyPressed(SDL_SCANCODE_DOWN)) {
+        dx =  8;
+    } else if (ImGui::IsKeyPressed(SDL_SCANCODE_PAGEUP)) {
+        dx = -64;
+    } else if (ImGui::IsKeyPressed(SDL_SCANCODE_PAGEDOWN)) {
+        dx =  64;
+    }
+
+    if (rgmui::ShiftIsDown()) {
+        dx *= 4;
+    }
+    return dx;
+}
+
 
 GraphiteApp::GraphiteApp(GraphiteConfig* config) 
     : m_Config(config)
@@ -296,6 +325,7 @@ InputsComponent::InputsComponent(rgmui::EventQueue* queue,
         InputsConfig* config)
     : m_EventQueue(queue)
     , m_TargetScroller(this)
+    , m_DragInputChanger(this)
     , m_FM2Path(fm2Path)
     , m_Config(config)
     , m_UndoRedo(queue, &m_Inputs)
@@ -308,7 +338,6 @@ InputsComponent::InputsComponent(rgmui::EventQueue* queue,
     , m_CurrentIndex(0)
     , m_OffsetMillis(0)
 {
-    m_Drag.Clear();
     queue->SubscribeI(EventType::SET_INPUT_TARGET_TO, [&](int v){
         ChangeTargetTo(v, false);
     });
@@ -357,6 +386,16 @@ void InputsComponent::HandleHotkeys() {
             if (ImGui::IsKeyPressed(sc, repeat)) {
                 DoInputAction(action);
             }
+        }
+    } 
+
+    if (m_DragInputChanger.IsDragging()) {
+        int dx = KeyPressedFrameAdvance();
+        if (dx) {
+            float y = ImGui::GetScrollY();
+            ImVec2 v = CalcLineSize();
+            y += (dx * v.y);
+            ImGui::SetScrollY(y);
         }
     }
 }
@@ -504,27 +543,11 @@ void InputsComponent::DoInputLine(int frameIndex) {
     ImGui::PushID(frameIndex);
     ImGui::InvisibleButton("input", m_LineSize);
     bool textHighlighted = m_AllowDragging && ImGui::IsItemHovered(ImGuiHoveredFlags_RectOnly);
-    if (m_Drag.IsDragging && textHighlighted) {
-        int s = frameIndex;
-        int e = m_Drag.LastHighlighted;
-        if (s > e) {
-            std::swap(s, e);
+    if (m_DragInputChanger.IsDragging() && textHighlighted) {
+        if (m_LockTarget == -1) {
+            ChangeTargetTo(frameIndex, true);
         }
-        for (int i = s; i <= e; i++) {
-            if (m_Drag.Button == 0) {
-                ChangeInputTo(i, m_Drag.HLButtons, true);
-            } else {
-                if (m_Drag.HighlightedFrames.size() > 1) {
-                    ChangeButtonTo(i, m_Drag.HLButtons, !m_Drag.StartedOn);
-                } else {
-                    if ((e - s) > 0) {
-                        ChangeButtonTo(m_Drag.StartFrameIndex, m_Drag.HLButtons, !m_Drag.StartedOn);
-                        ChangeButtonTo(i, m_Drag.HLButtons, !m_Drag.StartedOn);
-                    }
-                }
-            }
-        }
-        m_Drag.LastHighlighted = frameIndex;
+        m_DragInputChanger.DragTo(frameIndex);
     }
 
     ImVec2 dragDeltal = ImGui::GetMouseDragDelta(ImGuiMouseButton_Left);
@@ -541,7 +564,7 @@ void InputsComponent::DoInputLine(int frameIndex) {
     // Clicks in chevron column
     if (m_AllowDragging &&
         (targetDraggingAndGood || ImGui::IsMouseHoveringRect(gul, glr)) && 
-        !m_Drag.IsDragging && 
+        !m_DragInputChanger.IsDragging() && 
         ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
 
         m_TargetScroller.SuspendAutoScroll();
@@ -594,13 +617,13 @@ void InputsComponent::DoInputLine(int frameIndex) {
 
     ImVec2 txtpos(tul.x, p.y + 1);
     textHighlighted |= ImGui::IsPopupOpen("frame_popup");
-    bool inHighlightList = (m_Drag.IsDragging && m_Drag.HighlightedFrames.find(frameIndex) != m_Drag.HighlightedFrames.end());
+    bool inHighlightList = (m_DragInputChanger.IsDragging() && m_DragInputChanger.InDragList(frameIndex));
     textHighlighted |= inHighlightList;
     list->AddText(txtpos, TextColor(textHighlighted), FrameText(frameIndex).c_str());
 
     if (!rgmui::IsAnyPopupOpen() && ImGui::IsMouseHoveringRect(tul, tlr)) {
         if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && m_AllowDragging) {
-            m_Drag.StartDrag(frameIndex, 0x00, m_Inputs[frameIndex], false);
+            m_DragInputChanger.StartDrag(frameIndex, 0x00, m_Inputs[frameIndex], false);
             if (m_LockTarget == -1) {
                 m_TargetScroller.SuspendAutoScroll();
             }
@@ -617,7 +640,7 @@ void InputsComponent::DoInputLine(int frameIndex) {
             continue;
         }
         bool buttonOn = thisInput & button;
-        bool highlighted = inHighlightList && (button & m_Drag.HLButtons);
+        bool highlighted = inHighlightList && (button & m_DragInputChanger.HLButtons());
 
 
         int tx = p.x + bx + buttonCount * m_Config->ButtonWidth;
@@ -630,21 +653,23 @@ void InputsComponent::DoInputLine(int frameIndex) {
             }
 
             if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
-                m_Drag.StartDrag(frameIndex, button, button, buttonOn);
+                m_DragInputChanger.StartDrag(frameIndex, button, button, buttonOn);
                 if (m_LockTarget == -1) {
                     m_TargetScroller.SuspendAutoScroll();
                 }
             }
+
             if (ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
-                if (m_Drag.IsDragging && m_Drag.StartFrameIndex == frameIndex &&
-                        m_Drag.Button == button) {
+                if (m_DragInputChanger.IsDragging() && 
+                    !m_DragInputChanger.HasDragged() &&
+                    button == m_DragInputChanger.Button()) {
                     if (buttonOn) {
                         thisInput &= ~button;
                     } else {
                         thisInput |= button;
                     }
 
-                    ChangeInputTo(frameIndex, thisInput, true);
+                    ChangeInputTo(frameIndex, thisInput);
                 }
             }
         }
@@ -668,7 +693,7 @@ void InputsComponent::DoInputLine(int frameIndex) {
     }
     if (ImGui::BeginPopup("frame_popup")) {
         if (ImGui::MenuItem(fmt::format("clear {}", frameIndex + 1).c_str())) {
-            ChangeInputTo(frameIndex, 0x00, false);
+            ChangeInputTo(frameIndex, 0x00);
         }
         if (ImGui::MenuItem(fmt::format("insert before {}", frameIndex + 1).c_str())) {
             if (frameIndex < m_Inputs.size()) {
@@ -783,18 +808,11 @@ void InputsComponent::ChangeAllInputsTo(const std::vector<rgms::nes::ControllerS
     }
 }
 
-void InputsComponent::ChangeInputTo(int frameIndex, nes::ControllerState newState, bool isDragging) {
+void InputsComponent::ChangeInputTo(int frameIndex, nes::ControllerState newState) {
     if (m_LockTarget == -1) {
         ChangeTargetTo(frameIndex, true);
     }
-    if (isDragging) {
-        if (m_Drag.HighlightedFrames.find(frameIndex) == m_Drag.HighlightedFrames.end()) {
-            m_UndoRedo.ChangeInputTo(frameIndex, newState);
-            m_Drag.HighlightedFrames.insert(frameIndex);
-        }
-    } else {
-        m_UndoRedo.ChangeInputTo(frameIndex, newState);
-    }
+    m_UndoRedo.ChangeInputTo(frameIndex, newState);
 }
 void InputsComponent::ChangeButtonTo(int frameIndex, uint8_t button, bool onoff) {
     uint8_t input = m_Inputs[frameIndex];
@@ -803,7 +821,7 @@ void InputsComponent::ChangeButtonTo(int frameIndex, uint8_t button, bool onoff)
     } else {
         input &= ~button;
     }
-    ChangeInputTo(frameIndex, input, true);
+    ChangeInputTo(frameIndex, input);
 }
 
 void InputsComponent::DoInputList(ImVec2 p, int startIndex, int endIndex) {
@@ -813,25 +831,6 @@ void InputsComponent::DoInputList(ImVec2 p, int startIndex, int endIndex) {
     for (int i = startIndex; i < endIndex; i++) {
         DoInputLine(i);
     }
-}
-
-void InputsComponent::DragInfo::StartDrag(int frameIndex, uint8_t button, uint8_t hlButtons, bool on) {
-    IsDragging = true;
-    StartFrameIndex = frameIndex;
-    Button = button;
-    HLButtons = hlButtons;
-    LastHighlighted = frameIndex;
-    StartedOn = on;
-}
-
-void InputsComponent::DragInfo::Clear() {
-    IsDragging = false;
-    StartFrameIndex = -1;
-    Button = 0x00; 
-    HLButtons = 0x00;
-    StartedOn = false;
-    HighlightedFrames.clear();
-    LastHighlighted = -1;
 }
 
 void InputsComponent::OnSDLEvent(const SDL_Event& e) {
@@ -869,7 +868,6 @@ void InputsComponent::DoMainMenuBar() {
 }
 
 void InputsComponent::OnFrame() {
-    HandleHotkeys();
     DoMainMenuBar();
 
     if (ImGui::Begin(WindowName().c_str())) {
@@ -880,6 +878,7 @@ void InputsComponent::OnFrame() {
         ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(0, 0));
 
         ImGui::BeginChild("buttons", ImVec2(0, 0), true, ImGuiWindowFlags_NoMove);
+        HandleHotkeys();
         m_TargetScroller.UpdateScroll();
 
         ImGuiListClipper clipper;
@@ -902,11 +901,8 @@ void InputsComponent::OnFrame() {
         ImGui::PopStyleVar(2);
 
         if (ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
-            if (!m_Drag.HighlightedFrames.empty()) {
-                m_UndoRedo.ConsolidateLast(
-                        static_cast<int>(m_Drag.HighlightedFrames.size()));
-            }
-            m_Drag.Clear();
+            m_DragInputChanger.EndDrag();
+
             m_TargetDragging = false;
             m_CouldToggleLock = false;
         }
@@ -986,6 +982,106 @@ void InputsComponent::TargetScroller::SuspendAutoScroll() {
 void InputsComponent::TargetScroller::OnTargetChange(bool byUserInteraction) {
     if (!byUserInteraction && m_AutoScrollWasSetOnByUser && m_InputsComponent->m_Config->StickyAutoScroll) {
         m_AutoScroll = true;
+    }
+}
+
+InputsComponent::DragInputChanger::DragInputChanger(InputsComponent* inputs)
+    : m_InputsComponent(inputs)
+{
+    Clear();
+}
+
+InputsComponent::DragInputChanger::~DragInputChanger()
+{
+}
+
+void InputsComponent::DragInputChanger::Clear() {
+    m_IsDragging = false;
+    m_StartFrameIndex = -1;
+    m_EndFrameIndex = -1;
+    m_Button = 0x00; 
+    m_HLButtons = 0x00;
+    m_StartedOn = false;
+}
+
+bool InputsComponent::DragInputChanger::IsDragging() const {
+    return m_IsDragging;
+}
+
+bool InputsComponent::DragInputChanger::HasDragged() const {
+    return m_StartFrameIndex != m_EndFrameIndex;
+}
+
+uint8_t InputsComponent::DragInputChanger::HLButtons() const {
+    return m_HLButtons;
+}
+
+uint8_t InputsComponent::DragInputChanger::Button() const {
+    return m_Button;
+}
+
+bool InputsComponent::DragInputChanger::InDragList(int frameIndex) const {
+    return frameIndex >= m_StartFrameIndex && frameIndex < m_EndFrameIndex;
+}
+
+void InputsComponent::DragInputChanger::StartDrag(int frameIndex, uint8_t button, uint8_t hlButtons, bool on) {
+    m_InputsComponent->m_EventQueue->PublishI(EventType::SUSPEND_FRAME_ADVANCE, 1);
+    m_IsDragging = true;
+    m_StartFrameIndex = frameIndex;
+    m_EndFrameIndex = frameIndex;
+    m_Button = button;
+    m_HLButtons = hlButtons;
+    m_StartedOn = on;
+}
+
+void InputsComponent::DragInputChanger::EndDrag() {
+    m_InputsComponent->m_EventQueue->PublishI(EventType::SUSPEND_FRAME_ADVANCE, 0);
+    Clear();
+}
+
+void InputsComponent::DragInputChanger::DragMakeChange(int frameIndex) {
+    if (m_Button == 0) {
+        m_InputsComponent->ChangeInputTo(frameIndex, m_HLButtons);
+    } else {
+        m_InputsComponent->ChangeButtonTo(frameIndex, m_HLButtons, !m_StartedOn);
+    }
+}
+
+void InputsComponent::DragInputChanger::DragTo(int frameIndex) {
+    if (m_IsDragging && m_StartFrameIndex == m_EndFrameIndex && frameIndex == m_StartFrameIndex) {
+        return;
+    }
+
+    if (m_IsDragging &&
+        frameIndex < m_StartFrameIndex ||
+        frameIndex >= m_EndFrameIndex) {
+
+        if (m_StartFrameIndex == m_EndFrameIndex) { // First Drag
+            if (frameIndex < m_StartFrameIndex) {
+                m_StartFrameIndex = frameIndex;
+                m_EndFrameIndex++;
+            } else {
+                m_EndFrameIndex = frameIndex + 1;
+            }
+
+            for (int i = m_StartFrameIndex; i < m_EndFrameIndex; i++) {
+                DragMakeChange(i);
+            }
+        } else {
+            if (frameIndex < m_StartFrameIndex) {
+                for (int i = frameIndex; i < m_StartFrameIndex; i++) {
+                    DragMakeChange(i);
+                }
+
+                m_StartFrameIndex = frameIndex;
+            }
+            if (frameIndex >= m_EndFrameIndex) {
+                for (int i = m_EndFrameIndex; i <= frameIndex; i++) {
+                    DragMakeChange(i);
+                }
+                m_EndFrameIndex = frameIndex + 1;
+            }
+        }
     }
 }
 
@@ -1307,6 +1403,9 @@ RAMWatchConfig RAMWatchConfig::Defaults() {
 RAMWatchConfig RAMWatchConfig::SMBDefaults() {
     RAMWatchConfig cfg;
     cfg.Display = true;
+    cfg.Lines.emplace_back(false, "X-Position", 0x03ad);
+    cfg.Lines.emplace_back(false, "Y-Position", 0x00ce);
+    cfg.Lines.emplace_back(true, "", 0x0000);
     cfg.Lines.emplace_back(false, "X-Speed", 0x0057);
     cfg.Lines.emplace_back(false, "X-SubSpeed", 0x0705);
     cfg.Lines.emplace_back(false, "X-Pixel", 0x0086);
@@ -1629,8 +1728,12 @@ PlaybackComponent::PlaybackComponent(rgmui::EventQueue* queue)
     , m_PlaybackSpeed(1.0f)
     , m_IsPlaying(false)
     , m_LastTime(util::Now())
+    , m_SuspendFrameAdvance(false)
     , m_Accumulator(util::mclock::duration(0))
 {
+    m_EventQueue->SubscribeI(EventType::SUSPEND_FRAME_ADVANCE, [&](int v) {
+        m_SuspendFrameAdvance = static_cast<bool>(v);
+    });
 }
 
 PlaybackComponent::~PlaybackComponent() {
@@ -1640,29 +1743,11 @@ void PlaybackComponent::HandleHotkeys() {
     auto& io = ImGui::GetIO();
     int dx = 0;
     if (!io.WantCaptureKeyboard) {
-        if (ImGui::IsKeyPressed(SDL_SCANCODE_LEFT)) {
-            dx = -1;
-        } else if (ImGui::IsKeyPressed(SDL_SCANCODE_RIGHT)) {
-            dx =  1;
-        } else if (ImGui::IsKeyPressed(SDL_SCANCODE_BACKSPACE)) {
-            dx = -1;
-        } else if (ImGui::IsKeyPressed(SDL_SCANCODE_BACKSLASH)) {
-            dx =  1;
-        } else if (ImGui::IsKeyPressed(SDL_SCANCODE_UP)) {
-            dx = -8;
-        } else if (ImGui::IsKeyPressed(SDL_SCANCODE_DOWN)) {
-            dx =  8;
-        } else if (ImGui::IsKeyPressed(SDL_SCANCODE_PAGEUP)) {
-            dx = -64;
-        } else if (ImGui::IsKeyPressed(SDL_SCANCODE_PAGEDOWN)) {
-            dx =  64;
-        }
-
-        if (rgmui::ShiftIsDown()) {
-            dx *= 4;
-        }
-        if (dx) {
-            m_EventQueue->PublishI(EventType::SCROLL_INPUT_TARGET, dx);
+        if (!m_SuspendFrameAdvance) {
+            int dx = KeyPressedFrameAdvance();
+            if (dx) {
+                m_EventQueue->PublishI(EventType::SCROLL_INPUT_TARGET, dx);
+            }
         }
 
         if (ImGui::IsKeyPressed(SDL_SCANCODE_SPACE, false)) {
