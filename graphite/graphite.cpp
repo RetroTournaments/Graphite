@@ -937,6 +937,16 @@ void InputsComponent::TargetScroller::DoButtons() {
         }
         m_AutoScrollWasSetOnByUser = m_AutoScroll;
     }
+    int v = m_InputsComponent->m_TargetIndex;
+    int maxTarget = static_cast<int>(m_InputsComponent->m_Inputs.size());
+    ImGui::PushItemWidth(200);
+    if (rgmui::SliderIntExt("frame", &v, 0, maxTarget)) {
+        util::Clamp(&v, 0, maxTarget);
+        if (v != m_InputsComponent->m_TargetIndex) {
+            m_InputsComponent->ChangeTargetTo(v, false);
+        }
+    }
+    ImGui::PopItemWidth();
 }
 
 void InputsComponent::TargetScroller::UpdateScroll() {
