@@ -66,7 +66,9 @@ int main(int argc, char** argv) {
             useConfigApp = true;
         }
 
-        rgmui::Window window(config.WindowCfg.WindowWidth, config.WindowCfg.WindowHeight, "Graphite");
+        std::string windowTitle = fmt::format("Graphite - {}", GraphiteVersionString());
+
+        rgmui::Window window(config.WindowCfg.WindowWidth, config.WindowCfg.WindowHeight, windowTitle);
         spdlog::info("window created");
         ImGuiIO& io = ImGui::GetIO();
         io.IniFilename = NULL; 

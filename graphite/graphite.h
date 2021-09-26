@@ -33,6 +33,8 @@
 
 #include "nlohmann/json.hpp"
 
+#include "graphite/version.h"
+
 #include "rgmui/rgmui.h"
 #include "rgmnes/nes.h"
 #include "rgmvideo/video.h"
