@@ -66,12 +66,72 @@ enum EventType : int {
     REFRESH_CONFIG,
 };
 
+////////////////////////////////////////////////////////////////////////////////
+
+struct OverlayConfig {
+    float VideoOnEmu;
+    float EmuOnVideo;
+
+    float EmuEdgesOnVideo;
+    float VideoEdgesOnEmu;
+
+    float EdgeMinThreshold;
+    float EdgeMaxThreshold;
+    ImU32 EdgeColor;
+
+    static OverlayConfig Defaults();
+};
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(OverlayConfig,
+    VideoOnEmu,
+    EmuOnVideo,
+
+    EmuEdgesOnVideo,
+    VideoEdgesOnEmu,
+
+    EdgeMinThreshold,
+    EdgeMaxThreshold,
+    EdgeColor
+);
+
+class OverlayComponent : public rgms::rgmui::IApplicationComponent {
+public:
+    OverlayComponent(rgms::rgmui::EventQueue* queue, OverlayConfig* config);
+    ~OverlayComponent();
+
+    virtual void OnFrame() override;
+    static std::string WindowName();
+
+    void SetNewEmuFrame(cv::Mat img);
+    void SetNewVideoFrame(cv::Mat img);
+
+    void ApplyEmuOverlay(cv::Mat img, int screenMultiplier);
+    void ApplyVideoOverlay(cv::Mat img, int screenMultiplier);
+
+    bool NewVideoOverlay() const;
+    bool NewEmuOverlay() const;
+
+private:
+    void DoOverlay(cv::Mat from, float fromOn, float edgeOn,
+            cv::Mat img, int screenMultiplier);
+
+private:
+    rgms::rgmui::EventQueue* m_EventQueue;
+    OverlayConfig* m_Config;
+
+    bool m_NewVideoOverlay;
+    bool m_NewEmuOverlay;
+
+    cv::Mat m_EmuFrame;
+    cv::Mat m_VideoFrame;
+};
+
 struct EmuViewConfig;
 class NESEmulatorComponent : public rgms::rgmui::IApplicationComponent {
 public:
     NESEmulatorComponent(rgms::rgmui::EventQueue* queue, 
             const std::string& inesPath,
-            EmuViewConfig* emuViewConfig);
+            EmuViewConfig* emuViewConfig,
+            std::shared_ptr<OverlayComponent> overlay);
     ~NESEmulatorComponent();
 
     virtual void OnFrame() override;
@@ -299,6 +359,10 @@ private:
     int m_CurrentIndex;
 };
 
+////////////////////////////////////////////////////////////////////////////////
+
+////////////////////////////////////////////////////////////////////////////////
+
 class IEmuPeekSubComponent : public rgms::rgmui::IApplicationComponent {
 public:
     IEmuPeekSubComponent();
@@ -321,7 +385,8 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ScreenPeekConfig,
 
 class ScreenPeekSubComponent : public IEmuPeekSubComponent {
 public:
-    ScreenPeekSubComponent(rgms::rgmui::EventQueue* queue, ScreenPeekConfig* config);
+    ScreenPeekSubComponent(rgms::rgmui::EventQueue* queue, ScreenPeekConfig* config,
+            std::shared_ptr<OverlayComponent> overlay);
     virtual ~ScreenPeekSubComponent();
 
     virtual void CacheNewEmulatorData(rgms::nes::INESEmulator* emu) override;
@@ -344,6 +409,7 @@ private:
 private:
     rgms::rgmui::EventQueue* m_EventQueue;
     ScreenPeekConfig* m_Config;
+    std::shared_ptr<OverlayComponent> m_Overlay;
 
     rgms::nes::Frame m_Frame;
     cv::Mat m_Image;
@@ -411,7 +477,7 @@ class EmuViewComponent : public rgms::rgmui::IApplicationComponent {
 public:
     EmuViewComponent(rgms::rgmui::EventQueue* queue,
             std::unique_ptr<rgms::nes::INESEmulator>&& emu,
-            EmuViewConfig* config);
+            EmuViewConfig* config, std::shared_ptr<OverlayComponent> overlay);
     ~EmuViewComponent();
 
     virtual void OnFrame() override;
@@ -443,7 +509,8 @@ class VideoComponent : public rgms::rgmui::IApplicationComponent {
 public:
     VideoComponent(rgms::rgmui::EventQueue* queue,
             const std::string& videoPath,
-            VideoConfig* videoCfg);
+            VideoConfig* videoCfg,
+            std::shared_ptr<OverlayComponent> overlay);
     ~VideoComponent();
 
     virtual void OnFrame() override;
@@ -461,7 +528,7 @@ private:
     void UpdateOffset(int dx);
 
     void SetVideoFrame(int videoIndex);
-    void SetImageFromInputFrame();
+    void SetImageFromInputFrame(bool triggerNewFrame = true);
 
 
 private:
@@ -469,6 +536,7 @@ private:
     VideoConfig* m_Config;
     std::string m_VideoPath;
     std::unique_ptr<rgms::video::StaticVideoThread> m_VideoThread;
+    std::shared_ptr<OverlayComponent> m_Overlay;
 
     float m_PlatformFPS;
     int64_t m_CurrentVideoIndex;
@@ -535,6 +603,7 @@ struct GraphiteConfig {
     InputsConfig InputsCfg;
     EmuViewConfig EmuViewCfg;
     VideoConfig VideoCfg;
+    OverlayConfig OverlayCfg;
 
     static GraphiteConfig Defaults();
 };
@@ -547,7 +616,8 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(GraphiteConfig,
     ImguiIniSettings,
     InputsCfg,
     EmuViewCfg,
-    VideoCfg
+    VideoCfg,
+    OverlayCfg
 );
 
 bool ParseArgumentsToConfig(int* argc, char*** argv, const char* configfile, 

@@ -56,6 +56,7 @@ GraphiteConfig GraphiteConfig::Defaults() {
     config.InputsCfg = InputsConfig::Defaults();
     config.EmuViewCfg = EmuViewConfig::Defaults();
     config.VideoCfg = VideoConfig::Defaults();
+    config.OverlayCfg = OverlayConfig::Defaults();
     return config;
 }
 
@@ -138,14 +139,18 @@ static int KeyPressedFrameAdvance() {
 GraphiteApp::GraphiteApp(GraphiteConfig* config) 
     : m_Config(config)
 {
+    auto overlay = std::make_shared<OverlayComponent>(
+            &m_EventQueue, &m_Config->OverlayCfg);
+    RegisterComponent(overlay);
+
     RegisterComponent(std::make_shared<NESEmulatorComponent>(
-                &m_EventQueue, m_Config->InesPath, &m_Config->EmuViewCfg));
+                &m_EventQueue, m_Config->InesPath, &m_Config->EmuViewCfg, overlay));
     spdlog::info("registered NESEmulatorComponent");
     RegisterComponent(std::make_shared<InputsComponent>(
                 &m_EventQueue, m_Config->FM2Path, &m_Config->InputsCfg));
     spdlog::info("registered InputsComponent");
     RegisterComponent(std::make_shared<VideoComponent>(
-                &m_EventQueue, m_Config->VideoPath, &m_Config->VideoCfg));
+                &m_EventQueue, m_Config->VideoPath, &m_Config->VideoCfg, overlay));
     spdlog::info("registered VideoComponent");
     RegisterComponent(std::make_shared<PlaybackComponent>(
                 &m_EventQueue));
@@ -172,6 +177,7 @@ void GraphiteApp::SetupDockSpace() {
     ImGui::DockBuilderDockWindow(ScreenPeekSubComponent::WindowName().c_str(), screenNode);
     ImGui::DockBuilderDockWindow(VideoComponent::WindowName().c_str(), dockspaceId);
     ImGui::DockBuilderDockWindow(PlaybackComponent::WindowName().c_str(), playbackNode);
+    ImGui::DockBuilderDockWindow(OverlayComponent::WindowName().c_str(), playbackNode);
     ImGui::DockBuilderDockWindow(RAMWatchSubComponent::WindowName().c_str(), emuNode);
 
     ImGui::DockBuilderFinish(dockspaceId);
@@ -225,7 +231,8 @@ bool GraphiteApp::DoMainMenuBar() {
 
 NESEmulatorComponent::NESEmulatorComponent(rgmui::EventQueue* queue, 
         const std::string& inesPath,
-        EmuViewConfig* emuViewConfig) 
+        EmuViewConfig* emuViewConfig,
+        std::shared_ptr<OverlayComponent> overlay) 
     : m_EventQueue(queue)
     , m_EmulatorFactory(InitializeEmulatorFactory(inesPath))
     , m_StateSequenceThread(
@@ -242,7 +249,7 @@ NESEmulatorComponent::NESEmulatorComponent(rgmui::EventQueue* queue,
 
     RegisterSubComponent(std::make_shared<EmuViewComponent>(queue,
                 std::move(m_EmulatorFactory->GetEmu()),
-                emuViewConfig));
+                emuViewConfig, overlay));
 }
 
 nes::NESEmulatorFactorySPtr NESEmulatorComponent::InitializeEmulatorFactory(const std::string& inesPath) {
@@ -1211,11 +1218,12 @@ EmuViewConfig EmuViewConfig::Defaults() {
 
 EmuViewComponent::EmuViewComponent(rgmui::EventQueue* queue,
             std::unique_ptr<nes::INESEmulator>&& emu,
-            EmuViewConfig* config)
+            EmuViewConfig* config,
+            std::shared_ptr<OverlayComponent> overlay)
     : m_EventQueue(queue)
     , m_Emulator(std::move(emu))
 {
-    RegisterEmuPeekComponent(std::make_shared<ScreenPeekSubComponent>(queue, &config->ScreenPeekCfg));
+    RegisterEmuPeekComponent(std::make_shared<ScreenPeekSubComponent>(queue, &config->ScreenPeekCfg, overlay));
     RegisterEmuPeekComponent(std::make_shared<RAMWatchSubComponent>(queue, &config->RAMWatchCfg));
 
     m_EventQueue->SubscribeS(NES_STATE_SET_TO, [&](const std::string& state){
@@ -1255,9 +1263,10 @@ ScreenPeekConfig ScreenPeekConfig::Defaults() {
 }
 
 ScreenPeekSubComponent::ScreenPeekSubComponent(rgmui::EventQueue* queue,
-        ScreenPeekConfig* config)
+        ScreenPeekConfig* config, std::shared_ptr<OverlayComponent> overlay)
     : m_EventQueue(queue)
     , m_Config(config)
+    , m_Overlay(overlay)
 {
     m_EventQueue->Subscribe(EventType::REFRESH_CONFIG, [&](){
         ConstructImageFromFrame();
@@ -1271,6 +1280,11 @@ ScreenPeekSubComponent::~ScreenPeekSubComponent() {
 void ScreenPeekSubComponent::CacheNewEmulatorData(nes::INESEmulator* emu) {
     if (emu) {
         emu->ScreenPeekFrame(&m_Frame);
+
+        cv::Mat m = rgmui::ConstructPaletteImage(
+                m_Frame.data(), nes::FRAME_WIDTH, nes::FRAME_HEIGHT,
+                m_Config->NESPalette.data());
+        m_Overlay->SetNewEmuFrame(m);
         ConstructImageFromFrame();
     } else {
         SetBlankImage();
@@ -1283,6 +1297,7 @@ void ScreenPeekSubComponent::ConstructImageFromFrame() {
             m_Config->NESPalette.data());
     cv::resize(m_Image, m_Image, {}, m_Config->ScreenMultiplier, m_Config->ScreenMultiplier,
             cv::INTER_NEAREST);
+    m_Overlay->ApplyEmuOverlay(m_Image, m_Config->ScreenMultiplier);
 }
 
 void ScreenPeekSubComponent::SetBlankImage() {
@@ -1294,11 +1309,14 @@ void ScreenPeekSubComponent::SetBlankImage() {
 
 
 std::string ScreenPeekSubComponent::WindowName() {
-    return "Screen";
+    return "Emu Screen";
 }
 
 void ScreenPeekSubComponent::OnFrame() {
     if (ImGui::Begin(WindowName().c_str())) {
+        if (m_Overlay->NewEmuOverlay()) {
+            ConstructImageFromFrame();
+        }
         ImVec2 cursorPos = ImGui::GetCursorScreenPos();
         rgmui::Mat("screen", m_Image);
         if (ImGui::IsItemHovered()) {
@@ -1495,9 +1513,11 @@ VideoConfig VideoConfig::Defaults() {
 
 VideoComponent::VideoComponent(rgmui::EventQueue* queue,
         const std::string& videoPath,
-        VideoConfig* videoCfg)
+        VideoConfig* videoCfg,
+        std::shared_ptr<OverlayComponent> overlay)
     : m_EventQueue(queue)
     , m_Config(videoCfg)
+    , m_Overlay(overlay)
     , m_CurrentVideoIndex(-1)
     , m_InputTarget(0)
     , m_VideoPath(videoPath)
@@ -1608,15 +1628,19 @@ void VideoComponent::FindTargetFrame(int frameIndex) {
     SetVideoFrame(std::distance(m_PTS.begin(), it));
 }
 
-void VideoComponent::SetImageFromInputFrame() {
+void VideoComponent::SetImageFromInputFrame(bool triggerNewFrame) {
     if (m_LiveInputFrame) {
         m_Image = cv::Mat(
                 m_LiveInputFrame->Height,
                 m_LiveInputFrame->Width,
                 CV_8UC3,
                 m_LiveInputFrame->Buffer);
+        if (triggerNewFrame) {
+            m_Overlay->SetNewVideoFrame(m_Image);
+        }
         cv::resize(m_Image, m_Image, {}, m_Config->ScreenMultiplier, m_Config->ScreenMultiplier,
                 cv::INTER_NEAREST);
+        m_Overlay->ApplyVideoOverlay(m_Image, m_Config->ScreenMultiplier);
     } else {
         SetBlankImage();
     }
@@ -1675,6 +1699,9 @@ void VideoComponent::OnFrame() {
     }
     if (m_LiveInputFrame == m_WaitingFrame) {
         SetVideoFrame(m_CurrentVideoIndex);
+    }
+    if (m_Overlay->NewVideoOverlay()) {
+        SetImageFromInputFrame(false);
     }
     if (ImGui::Begin(WindowName().c_str())) {
         rgmui::Mat("screen", m_Image);
@@ -1934,3 +1961,131 @@ bool GraphiteConfigApp::OnFrame() {
     }
     return ret;
 }
+
+OverlayConfig OverlayConfig::OverlayConfig::Defaults() {
+    OverlayConfig cfg;
+    cfg.VideoOnEmu = 0.0f;
+    cfg.EmuOnVideo = 0.0f;
+
+    cfg.EmuEdgesOnVideo = 0.0f;
+    cfg.VideoEdgesOnEmu = 0.0f;
+
+    cfg.EdgeMinThreshold = 100.0f;
+    cfg.EdgeMaxThreshold = 200.0f;
+    cfg.EdgeColor = IM_COL32(255, 0, 255, 255);
+
+    return cfg;
+}
+
+OverlayComponent::OverlayComponent(rgms::rgmui::EventQueue* queue, OverlayConfig* config)
+    : m_EventQueue(queue)
+    , m_Config(config)
+    , m_NewVideoOverlay(false)
+    , m_NewEmuOverlay(false)
+{
+}
+
+OverlayComponent::~OverlayComponent() {
+}
+
+std::string OverlayComponent::WindowName() {
+    return "Overlay";
+}
+
+void OverlayComponent::OnFrame() {
+    if (ImGui::Begin(WindowName().c_str())) {
+        auto OverlaySlider = [&](const char* label, float* v){
+            if (rgmui::SliderFloatExt(label, v, 0.0f, 1.0f)) {
+                util::Clamp(v, 0.0f, 1.0f);
+                m_EventQueue->Publish(EventType::REFRESH_CONFIG);
+            }
+        };
+
+        OverlaySlider("emu on video", &m_Config->EmuOnVideo);
+        OverlaySlider("emu edges on video", &m_Config->EmuEdgesOnVideo);
+        OverlaySlider("video on emu", &m_Config->VideoOnEmu);
+        OverlaySlider("video edges on emu", &m_Config->VideoEdgesOnEmu);
+
+        ImGui::Separator();
+        ImVec4 c = ImGui::ColorConvertU32ToFloat4(m_Config->EdgeColor);
+        if (ImGui::ColorEdit3("edge color", &c.x)) {
+            m_Config->EdgeColor = ImGui::ColorConvertFloat4ToU32(c);
+            m_EventQueue->Publish(EventType::REFRESH_CONFIG);
+        }
+        if (rgmui::SliderFloatExt("Edge Min Threshold", &m_Config->EdgeMinThreshold, 0.0f, 300.0f)) {
+            m_EventQueue->Publish(EventType::REFRESH_CONFIG);
+        }
+        if (rgmui::SliderFloatExt("Edge Max Threshold", &m_Config->EdgeMaxThreshold, 0.0f, 300.0f)) {
+            m_EventQueue->Publish(EventType::REFRESH_CONFIG);
+        }
+
+    }
+    ImGui::End();
+}
+
+bool OverlayComponent::NewVideoOverlay() const {
+    return m_NewVideoOverlay;
+}
+bool OverlayComponent::NewEmuOverlay() const {
+    return m_NewEmuOverlay;
+}
+
+void OverlayComponent::SetNewEmuFrame(cv::Mat img) {
+    m_EmuFrame = img.clone();
+    m_NewVideoOverlay = true;
+}
+
+void OverlayComponent::SetNewVideoFrame(cv::Mat img) {
+    m_VideoFrame = img.clone();
+    m_NewEmuOverlay = true;
+}
+
+void OverlayComponent::ApplyEmuOverlay(cv::Mat img, int screenMultiplier) {
+    DoOverlay(m_VideoFrame, m_Config->VideoOnEmu, m_Config->VideoEdgesOnEmu, img, screenMultiplier);
+    m_NewEmuOverlay = false;
+}
+
+void OverlayComponent::ApplyVideoOverlay(cv::Mat img, int screenMultiplier) {
+    DoOverlay(m_EmuFrame, m_Config->EmuOnVideo, m_Config->EmuEdgesOnVideo, img, screenMultiplier);
+    m_NewVideoOverlay = false;
+}
+
+void OverlayComponent::DoOverlay(cv::Mat from, float fromOn, float edgeOn, cv::Mat img, int screenMultiplier) {
+    cv::Scalar edgeColor;
+    edgeColor[0] = static_cast<uint8_t>((m_Config->EdgeColor & 0x00ff0000) >> 16);
+    edgeColor[1] = static_cast<uint8_t>((m_Config->EdgeColor & 0x0000ff00) >>  8);
+    edgeColor[2] = static_cast<uint8_t>((m_Config->EdgeColor & 0x000000ff) >>  0);
+
+    if (from.rows != 0) {
+        if (fromOn > 0.0f) {
+            cv::Mat m;
+            cv::resize(from, m, {}, screenMultiplier, screenMultiplier, cv::INTER_NEAREST);
+            cv::addWeighted(img, 1.0 - fromOn, m, fromOn, 0.0, img);
+        }
+
+        if (edgeOn > 0.0f) {
+            cv::Mat edges;
+            cv::Canny(from, edges, m_Config->EdgeMinThreshold, m_Config->EdgeMaxThreshold);
+            std::vector<std::vector<cv::Point>> contours;
+            std::vector<cv::Vec4i> hierarchy;
+
+
+            cv::findContours(edges, contours, hierarchy,
+                    cv::RETR_LIST, cv::CHAIN_APPROX_SIMPLE);
+
+            for (auto & cnt : contours) {
+                for (auto & pt : cnt) {
+                    pt.x *= screenMultiplier;
+                    pt.y *= screenMultiplier;
+                }
+            }
+
+            cv::Mat m = img.clone();
+            for (int i = 0; i < contours.size(); i++) {
+                cv::drawContours(m, contours, i, edgeColor, 1);
+            }
+            cv::addWeighted(img, 1.0 - edgeOn, m, edgeOn, 0.0, img);
+        }
+    }
+}
+
