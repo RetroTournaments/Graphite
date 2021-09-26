@@ -59,6 +59,7 @@ public:
 
     virtual uint8_t CPUPeek(uint16_t addr) const override;
     virtual uint8_t PPUPeek8(uint16_t addr) const override;
+    virtual void PPUPeekScroll(uint8_t* xfine, uint8_t* yfine) const override;
     virtual uint8_t OAMPeek8(uint8_t addr) const override;
     virtual uint8_t ScreenPeekPixel(int x, int y) const override;
 
