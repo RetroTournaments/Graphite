@@ -33,4 +33,9 @@ add_library(rgmutillib
 target_include_directories(rgmutillib PUBLIC
     ${nlohmann_json_INCLUDE_DIRS}
 )
+if (UNIX)
+    target_link_libraries(rgmutillib
+        stdc++fs
+    )
+endif()
 
