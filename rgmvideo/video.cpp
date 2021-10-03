@@ -394,7 +394,7 @@ std::string CVVideoCaptureSource::GetInformation() {
 
 StaticVideoBufferConfig StaticVideoBufferConfig::Defaults() {
     StaticVideoBufferConfig cfg;
-    cfg.BufferSize = 1024 * 1024 * 1024;
+    cfg.BufferSize = static_cast<size_t>(1024 * 1024 * 1024);
     cfg.ForwardBias = 0.5;
     return cfg;
 }
@@ -415,7 +415,7 @@ StaticVideoBuffer::StaticVideoBuffer(IVideoSourcePtr source,
 
     int imSize = ImageDataBufferSize();
     if (imSize > 0) {
-        m_MaxRecords = static_cast<int>(m_Config.BufferSize / static_cast<size_t>(imSize));
+        m_MaxRecords = m_Config.BufferSize / static_cast<size_t>(imSize);
         m_MaxRecords += 1;
         m_Data.resize(m_MaxRecords * imSize);
     }

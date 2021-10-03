@@ -30,6 +30,7 @@
 #include <type_traits>
 #include <algorithm>
 #include <iterator>
+#include <random>
 #include <iostream>
 #include <string>
 #include <array>
@@ -91,10 +92,18 @@ inline uint8_t Reverse(uint8_t b) {
 //
 ////////////////////////////////////////////////////////////////////////////////
 template <typename T> 
-void Clamp(T* v, T lo, T hi) {
+bool Clamp(T* v, T lo, T hi) {
     assert(v);
-    if (*v < lo) *v = lo;
-    if (*v > hi) *v = hi;
+    bool r = false;
+    if (*v < lo) {
+        *v = lo;
+        r = true;
+    }
+    if (*v > hi) {
+        *v = hi;
+        r = true;
+    }
+    return r;
 }
 
 template <typename T> 
@@ -683,6 +692,123 @@ void WriteVectorToFile(const std::string& path, const std::vector<uint8_t>& cont
 ////////////////////////////////////////////////////////////////////////////////
 bool StringEndsWith(const std::string& str, const std::string& ending);
 bool StringStartsWith(const std::string& str, const std::string& start);
+
+////////////////////////////////////////////////////////////////////////////////
+// Reservoir Sampling
+////////////////////////////////////////////////////////////////////////////////
+template <class RandomIt, class UniformRandomNumberGenerator>
+void ReservoirSampleVec(const RandomIt first, const RandomIt last, RandomIt outputFirst, RandomIt outputLast,
+                      UniformRandomNumberGenerator&& g) {
+    typedef typename std::iterator_traits<RandomIt>::difference_type diff_t;
+    typedef typename std::make_unsigned<diff_t>::type udiff_t;
+    typedef typename std::uniform_int_distribution<udiff_t> distr_t;
+
+    std::uniform_real_distribution<double> real_dist(std::nextafter(0, 10), std::nextafter(1, 10));
+
+    udiff_t n = last - first;
+    udiff_t R = outputLast - outputFirst;
+
+    // fill the output with the first R elements
+    udiff_t j = 0;
+    while (j < R && j < n) {
+        *std::next(outputFirst, j) = *std::next(first, j);
+        j++;
+    }
+
+    // do regular reservoir sampling up to a certain point
+    udiff_t t = R * 4;
+    if (t < 200) {
+        t = 200;
+    }
+    while (j <= t && j < n) {
+        udiff_t k = distr_t(0, j)(g);
+        if (k < R) {
+            *std::next(outputFirst, k) = *std::next(first, j);
+        }
+        j++;
+    }
+
+    // do gap sampling
+    while (j < n) {
+        double p = static_cast<double>(R) / static_cast<double>(j);
+        double u = real_dist(g);
+        udiff_t gap = static_cast<udiff_t>(std::log(u) / std::log1p(-p));
+
+        j += gap;
+        if (j < n) {
+            udiff_t k = distr_t(0, R - 1)(g);
+            *std::next(outputFirst, k) = *std::next(first, j);
+        }
+        j++;
+    }
+}
+
+template <typename T>
+class OnlineReservoirSampler {
+public:
+    OnlineReservoirSampler(size_t given_reservoir_size, int seed) 
+        : Reservoir(given_reservoir_size)
+        , m_ReservoirSize(given_reservoir_size) 
+        , m_Count(0)
+        , m_GapCutoff(given_reservoir_size * 4)
+        , m_Gap(0)
+        , m_Engine(seed)
+    {
+    };
+    ~OnlineReservoirSampler() {};
+
+    void Process(const T& val) {
+        if (m_Gap > 0) {
+            m_Gap--;
+        } else {
+            if (m_Count < m_ReservoirSize) {
+                Reservoir[m_Count] = val;
+            } else if (m_Count < m_GapCutoff) {
+                size_t k = GetK(m_Count);
+                if (k < m_ReservoirSize) {
+                    Reservoir[k] = val;
+                }
+            } else {
+                if (m_Count == m_GapCutoff) {
+                    m_Gap = GetGap();
+
+                    if (m_Gap == 0) {
+                        size_t k = GetK(m_ReservoirSize - 1);
+                        Reservoir[k] = val;
+                    }
+                } else {
+                    size_t k = GetK(m_ReservoirSize - 1);
+                    Reservoir[k] = val;
+
+                    m_Gap = GetGap();
+                }
+            }
+        }
+
+        m_Count++;
+    }
+
+    std::vector<T> Reservoir;
+private:
+    size_t m_ReservoirSize;
+    size_t m_Count;
+    size_t m_GapCutoff;
+    size_t m_Gap;
+
+    size_t GetK(size_t top) {
+        typedef std::uniform_int_distribution<size_t> distr_t;
+        return distr_t(0, top)(m_Engine);
+    }
+
+    size_t GetGap() {
+        double p = static_cast<double>(m_ReservoirSize) / static_cast<double>(m_Count);
+        double u = std::uniform_real_distribution<double>(std::nextafter(0, 10),
+                std::nextafter(1, 10))(m_Engine);
+        return std::floor(std::log(u) / std::log1p(-p));
+    }
+
+    std::mt19937_64 m_Engine;
+};
 
 }
 
