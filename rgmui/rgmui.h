@@ -314,23 +314,6 @@ bool Combo(const char* label, T* v, const Q& container) {
     return Combo2<T, Q>(label, v, container, toStr);
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// OpenCV Extensions
-////////////////////////////////////////////////////////////////////////////////
-cv::Mat CropWithZeroPadding(cv::Mat img, cv::Rect r);
-
-// 
-enum class PaletteDataOrder {
-    RGB,
-    BGR
-};
-cv::Mat ConstructPaletteImage(
-    const uint8_t* imgData,
-    int width, int height, 
-    const uint8_t* paletteData,
-    PaletteDataOrder paletteDataOrder = PaletteDataOrder::RGB
-);
-
 }
 
 #endif

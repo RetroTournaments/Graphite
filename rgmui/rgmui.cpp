@@ -529,65 +529,6 @@ void rgms::rgmui::Mat(const char* label, const cv::Mat& img) {
 
 
 ////////////////////////////////////////////////////////////////////////////////
-cv::Mat rgms::rgmui::CropWithZeroPadding(cv::Mat img, cv::Rect cropRect) {
-    if (img.empty()) {
-        return img;
-    }
-    if (cropRect.width < 0) {
-        cropRect.x += cropRect.width;
-        cropRect.width = -cropRect.width;
-    }
-    if (cropRect.height < 0) {
-        cropRect.y += cropRect.height;
-        cropRect.height = -cropRect.height;
-    }
-
-    cv::Rect imgRect = cv::Rect(0, 0, img.cols, img.rows);
-    cv::Rect overLapRect = imgRect & cropRect;
-    if (overLapRect.width == cropRect.width && overLapRect.height == cropRect.height) {
-        return img(overLapRect);
-    }
-
-    // add padding still
-    cv::Mat m = cv::Mat::zeros(cropRect.height, cropRect.width, img.type());
-    if (overLapRect.width > 0 && overLapRect.height > 0) {
-        img(overLapRect).copyTo(m(cv::Rect(overLapRect.x - cropRect.x, overLapRect.y - cropRect.y, overLapRect.width, overLapRect.height)));
-    }
-    return m;
-}
-
-cv::Mat rgms::rgmui::ConstructPaletteImage(
-    const uint8_t* imgData,
-    int width, int height, 
-    const uint8_t* paletteData,
-    PaletteDataOrder paletteDataOrder
-) {
-
-    cv::Mat m(height, width, CV_8UC3);
-
-    uint8_t* o = reinterpret_cast<uint8_t*>(m.data);
-
-    int a = 0;
-    int b = 1;
-    int c = 2;
-
-    if (paletteDataOrder == PaletteDataOrder::RGB) {
-        std::swap(a, c);
-    }
-
-    for (int k = 0; k < (width * height); k++) {
-        const uint8_t* p = paletteData + (*imgData * 3);
-
-        *(o + 0) = *(p + a);
-        *(o + 1) = *(p + b);
-        *(o + 2) = *(p + c);
-
-        o += 3;
-        imgData++;
-    }
-    return m;
-}
-
 ////////////////////////////////////////////////////////////////////////////////
 
 MatAnnotator::MatAnnotator(const char* label, const cv::Mat& mat, float scale, Vector2F origin, 
