@@ -190,7 +190,7 @@ bool InputText(const char* label, std::string* str,
 
 template <typename... T>
 void TextFmt(fmt::format_string<T...> fmt, T&&... args) {
-    ImGui::TextUnformatted(fmt::format(fmt, args...).c_str());
+    ImGui::TextUnformatted(fmt::vformat(fmt, fmt::make_format_args(args...)).c_str());
 }
 
 // When hovered these sliders adjust the values based on arrow keys / mouse
