@@ -269,3 +269,12 @@ void rgms::util::WriteVectorToFile(const std::string& path, const std::vector<ui
     }
     ofs.write(reinterpret_cast<const char*>(contents.data()), contents.size());
 }
+
+std::string rgms::util::ReadFileToString(const std::string& path) {
+    std::ifstream ifs(path);
+    if (!ifs.good()) {
+        throw std::invalid_argument("ifstream not good");
+    }
+    return std::string(std::istreambuf_iterator<char>(ifs), std::istreambuf_iterator<char>());
+}
+

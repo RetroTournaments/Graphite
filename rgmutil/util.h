@@ -684,7 +684,9 @@ void ForFileOfExtensionInDirectory(const std::string& directory,
         std::function<bool(fs::path p)> cback);
 
 int ReadFileToVector(const std::string& path, std::vector<uint8_t>* contents);
+std::string ReadFileToString(const std::string& path);
 void WriteVectorToFile(const std::string& path, const std::vector<uint8_t>& contents);
+
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -692,6 +694,7 @@ void WriteVectorToFile(const std::string& path, const std::vector<uint8_t>& cont
 ////////////////////////////////////////////////////////////////////////////////
 bool StringEndsWith(const std::string& str, const std::string& ending);
 bool StringStartsWith(const std::string& str, const std::string& start);
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // Reservoir Sampling
@@ -809,6 +812,65 @@ private:
 
     std::mt19937_64 m_Engine;
 };
+
+
+////////////////////////////////////////////////////////////////////////////////
+// Easing
+////////////////////////////////////////////////////////////////////////////////
+enum class EasingType : int {
+    LINEAR,
+    IN_SINE,
+    OUT_SINE,
+    INOUT_SINE,
+};
+inline std::array<EasingType, 4> EasingTypes() {
+    return {EasingType::LINEAR, EasingType::IN_SINE, EasingType::OUT_SINE, EasingType::INOUT_SINE};
+}
+inline std::string EasingTypeToString(EasingType etype) {
+    switch (etype) {
+        case EasingType::LINEAR: return "LINEAR"; break;
+        case EasingType::IN_SINE: return "IN_SINE"; break;
+        case EasingType::OUT_SINE: return "OUT_SINE"; break;
+        case EasingType::INOUT_SINE: return "INOUT_SINE"; break;
+    }
+}
+inline std::ostream& operator<<(std::ostream& os, EasingType etype) {
+    os << EasingTypeToString(etype);
+    return os;
+}
+
+// x is between 0 and 1, return another number between 0 and 1 which has applied
+// the easing
+template <typename T>
+T Ease(const EasingType& etype, T x) {
+    T pi = static_cast<T>(3.14159265358979);
+    switch (etype) {
+        case EasingType::LINEAR: {
+            return x; 
+            break;
+        }
+        case EasingType::IN_SINE: {
+            return 1 - std::cos((x * pi) / 2);
+            break;
+        }
+        case EasingType::OUT_SINE: {
+            return std::sin((x * pi) / 2); 
+            break;
+        }
+        case EasingType::INOUT_SINE: {
+            return  -(std::cos(pi * x) - 1) / 2;
+            break;
+        }
+    }
+}
+
+
+// returns y
+template <typename T>
+T Lerp(T x, T x0, T x1, T y0, T y1) {
+    return y0 + (x - x0) * (y1 - y0) / (x1 - x0);
+}
+
 
 }
 
