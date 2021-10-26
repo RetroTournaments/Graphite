@@ -1262,6 +1262,32 @@ ScreenPeekConfig ScreenPeekConfig::Defaults() {
     return cfg;
 }
 
+static cv::Mat ConstructPaletteImage(
+    const uint8_t* imgData,
+    int width, int height, 
+    const uint8_t* paletteData
+) {
+    cv::Mat m(height, width, CV_8UC3);
+
+    uint8_t* o = reinterpret_cast<uint8_t*>(m.data);
+
+    int a = 2;
+    int b = 1;
+    int c = 0;
+
+    for (int k = 0; k < (width * height); k++) {
+        const uint8_t* p = paletteData + (*imgData * 3);
+
+        *(o + 0) = *(p + a);
+        *(o + 1) = *(p + b);
+        *(o + 2) = *(p + c);
+
+        o += 3;
+        imgData++;
+    }
+    return m;
+}
+
 ScreenPeekSubComponent::ScreenPeekSubComponent(rgmui::EventQueue* queue,
         ScreenPeekConfig* config, std::shared_ptr<OverlayComponent> overlay)
     : m_EventQueue(queue)
@@ -1281,7 +1307,7 @@ void ScreenPeekSubComponent::CacheNewEmulatorData(nes::INESEmulator* emu) {
     if (emu) {
         emu->ScreenPeekFrame(&m_Frame);
 
-        cv::Mat m = rgmui::ConstructPaletteImage(
+        cv::Mat m = ConstructPaletteImage(
                 m_Frame.data(), nes::FRAME_WIDTH, nes::FRAME_HEIGHT,
                 m_Config->NESPalette.data());
         m_Overlay->SetNewEmuFrame(m);
@@ -1292,7 +1318,7 @@ void ScreenPeekSubComponent::CacheNewEmulatorData(nes::INESEmulator* emu) {
 }
 
 void ScreenPeekSubComponent::ConstructImageFromFrame() {
-    m_Image = rgmui::ConstructPaletteImage(
+    m_Image = ConstructPaletteImage(
             m_Frame.data(), nes::FRAME_WIDTH, nes::FRAME_HEIGHT,
             m_Config->NESPalette.data());
     cv::resize(m_Image, m_Image, {}, m_Config->ScreenMultiplier, m_Config->ScreenMultiplier,

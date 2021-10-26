@@ -68,6 +68,33 @@ cv::Mat carbon::GetFilterPerspectiveMatrix(int width, int height, const FilterCo
     return cv::getPerspectiveTransform(inquad, outquad);
 }
 
+static cv::Mat CropWithZeroPadding(cv::Mat img, cv::Rect cropRect) {
+    if (img.empty()) {
+        return img;
+    }
+    if (cropRect.width < 0) {
+        cropRect.x += cropRect.width;
+        cropRect.width = -cropRect.width;
+    }
+    if (cropRect.height < 0) {
+        cropRect.y += cropRect.height;
+        cropRect.height = -cropRect.height;
+    }
+
+    cv::Rect imgRect = cv::Rect(0, 0, img.cols, img.rows);
+    cv::Rect overLapRect = imgRect & cropRect;
+    if (overLapRect.width == cropRect.width && overLapRect.height == cropRect.height) {
+        return img(overLapRect);
+    }
+
+    // add padding still
+    cv::Mat m = cv::Mat::zeros(cropRect.height, cropRect.width, img.type());
+    if (overLapRect.width > 0 && overLapRect.height > 0) {
+        img(overLapRect).copyTo(m(cv::Rect(overLapRect.x - cropRect.x, overLapRect.y - cropRect.y, overLapRect.width, overLapRect.height)));
+    }
+    return m;
+}
+
 cv::Mat carbon::ApplyFilter(const cv::Mat img, const FilterConfig& filter, 
         const rgms::video::PixelContributions& contributions) {
     cv::Rect cropRect(
@@ -79,8 +106,7 @@ cv::Mat carbon::ApplyFilter(const cv::Mat img, const FilterConfig& filter,
 
     if (filter.Type == FilterType::CROP) {
 
-        cv::Mat ret = rgms::rgmui::CropWithZeroPadding(img, cropRect);
-        if (!(ret.rows == 0 || ret.cols == 0)) {
+        cv::Mat ret = CropWithZeroPadding(img, cropRect); if (!(ret.rows == 0 || ret.cols == 0)) {
             cv::resize(ret, ret, {filter.OutWidth, filter.OutHeight}, 
                     0, 0, cv::INTER_AREA);
         }
@@ -92,7 +118,7 @@ cv::Mat carbon::ApplyFilter(const cv::Mat img, const FilterConfig& filter,
         cv::Mat m = GetFilterPerspectiveMatrix(img.cols, img.rows, filter);
         cv::warpPerspective(img, ret, m, img.size());
 
-        ret = rgms::rgmui::CropWithZeroPadding(ret, cropRect);
+        ret = CropWithZeroPadding(ret, cropRect);
         if (!(ret.rows == 0 || ret.cols == 0)) {
             cv::resize(ret, ret, {filter.OutWidth, filter.OutHeight}, 0, 0, cv::INTER_AREA);
         }
@@ -238,7 +264,7 @@ void CarbonApp::ReadFrame() {
             cv::resize(m_OutImage, m_OutImage, {}, m_OutMult, m_OutMult, cv::INTER_NEAREST);
         }
 
-        m_Image = rgmui::CropWithZeroPadding(m_Image, 
+        m_Image = CropWithZeroPadding(m_Image, 
                 cv::Rect(-50, -50, m_Image.cols + 100, m_Image.rows + 100));
         if (m_FrameMult > 0 && m_FrameMult != 1.0) {
             cv::resize(m_Image, m_Image, {}, m_FrameMult, m_FrameMult);
