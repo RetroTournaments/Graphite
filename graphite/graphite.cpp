@@ -221,6 +221,7 @@ bool GraphiteApp::DoMainMenuBar() {
             ImGui::PopItemWidth();
             ImGui::Checkbox("Sticky auto-scroll", &m_Config->InputsCfg.StickyAutoScroll);
             ImGui::Checkbox("Display RAM watch", &m_Config->EmuViewCfg.RAMWatchCfg.Display);
+            ImGui::Checkbox("Allow LR and UD", &m_Config->InputsCfg.AllowLROrUD);
             ImGui::EndMenu();
         }
 
@@ -377,6 +378,7 @@ InputsConfig InputsConfig::Defaults() {
     cfg.HighlightTextColor = IM_COL32_WHITE;
     cfg.ButtonColor = IM_COL32(215,  25,  25, 255);
     cfg.MarkerColor = IM_COL32( 25,  25, 215, 255);
+    cfg.AllowLROrUD = false;
     cfg.StickyAutoScroll = true;
     cfg.VisibleButtons = 0b11111111;
 
@@ -758,7 +760,10 @@ void InputsComponent::DoInputLine(int frameIndex) {
                         thisInput &= ~button;
                     } else {
                         thisInput |= button;
+                        CheckLRUD(button, &thisInput);
                     }
+
+
 
                     ChangeInputTo(frameIndex, thisInput);
                 }
@@ -990,6 +995,20 @@ void InputsComponent::ChangeAllInputsTo(const std::vector<rgms::nes::ControllerS
     }
 }
 
+void InputsComponent::CheckLRUD(uint8_t button, uint8_t* input) {
+    if (!m_Config->AllowLROrUD) {
+        if (button == nes::Button::LEFT) {
+            *input &= ~nes::Button::RIGHT;
+        } else if (button == nes::Button::RIGHT) {
+            *input &= ~nes::Button::LEFT;
+        } else if (button == nes::Button::UP) {
+            *input &= ~nes::Button::DOWN;
+        } else if (button == nes::Button::DOWN) {
+            *input &= ~nes::Button::UP;
+        }
+    }
+}
+
 void InputsComponent::ChangeInputTo(int frameIndex, nes::ControllerState newState) {
     if (m_LockTarget == -1) {
         ChangeTargetTo(frameIndex, true);
@@ -1000,6 +1019,7 @@ void InputsComponent::ChangeButtonTo(int frameIndex, uint8_t button, bool onoff)
     uint8_t input = m_Inputs[frameIndex];
     if (onoff) {
         input |= button;
+        CheckLRUD(button, &input);
     } else {
         input &= ~button;
     }

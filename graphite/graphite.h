@@ -209,6 +209,7 @@ struct InputsConfig {
     int FrameTextNumDigits;
     int MaxInputSize;
 
+    bool AllowLROrUD;
     bool StickyAutoScroll;
     uint8_t VisibleButtons;
 
@@ -228,6 +229,7 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(InputsConfig,
     ButtonWidth,
     FrameTextNumDigits,
     MaxInputSize,
+    AllowLROrUD,
     StickyAutoScroll,
     VisibleButtons,
     TextColor,
@@ -369,6 +371,8 @@ private:
     void HandleHotkeys();
     std::pair<int, int> FindPreviousJump();
     void DoInputAction(InputAction actions);
+
+    void CheckLRUD(uint8_t button, uint8_t* input);
 
 private:
     std::string OffsetLine() const;
