@@ -154,6 +154,16 @@ enum class InputAction {
     SMB_JUMP,
     SMB_JUMP_SHORTER,
     SMB_JUMP_LONGER,
+    SMB_FULL_JUMP,
+    SMB_REMOVE_LAST_JUMP,
+    SMB_START,
+    SMB_INSERT_FRAMERULE,
+    SMB_DELETE_FRAMERULE,
+
+    SET_REMOVE_MARKER,
+    GOTO_MARKER,
+    INSERT_FRAME,
+    DELETE_FRAME,
 };
 NLOHMANN_JSON_SERIALIZE_ENUM(InputAction, {
    {InputAction::SMB_JUMP_EARLIER, "smb_jump_earlier"},
@@ -161,8 +171,35 @@ NLOHMANN_JSON_SERIALIZE_ENUM(InputAction, {
    {InputAction::SMB_JUMP, "smb_jump"},
    {InputAction::SMB_JUMP_SHORTER, "smb_jump_shorter"},
    {InputAction::SMB_JUMP_LONGER, "smb_jump_longer"},
+   {InputAction::SMB_FULL_JUMP, "smb_full_jump"},
+   {InputAction::SMB_REMOVE_LAST_JUMP, "smb_remove_last_jump"},
+   {InputAction::SMB_START, "smb_start"},
+   {InputAction::SMB_INSERT_FRAMERULE, "smb_insert_framerule"},
+   {InputAction::SMB_DELETE_FRAMERULE, "smb_delete_framerule"},
+
+   {InputAction::SET_REMOVE_MARKER, "set_remove_marker"},
+   {InputAction::GOTO_MARKER, "goto_marker"},
+   {InputAction::INSERT_FRAME, "insert_frame"},
+   {InputAction::DELETE_FRAME, "delete_frame"},
 })
 JSONEXT_SERIALIZE_ENUM_OPERATORS(InputAction);
+
+struct HotkeyConfig {
+    HotkeyConfig();
+    HotkeyConfig(SDL_Scancode sc, SDL_Keymod km, bool rpt, InputAction act);
+
+    SDL_Scancode Scancode;
+    SDL_Keymod Keymod;
+    bool Repeat;
+    InputAction Action;
+};
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(HotkeyConfig,
+    Scancode,
+    Keymod,
+    Repeat,
+    Action
+);
+
 
 struct InputsConfig {
     int ColumnPadding;
@@ -178,8 +215,9 @@ struct InputsConfig {
     ImU32 TextColor;
     ImU32 HighlightTextColor;
     ImU32 ButtonColor;
+    ImU32 MarkerColor;
 
-    std::vector<std::tuple<SDL_Scancode, bool, InputAction>> Hotkeys;
+    std::vector<HotkeyConfig> Hotkeys;
 
     static InputsConfig Defaults();
 };
@@ -195,6 +233,7 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(InputsConfig,
     TextColor,
     HighlightTextColor,
     ButtonColor,
+    MarkerColor,
     Hotkeys
 );
 
@@ -317,6 +356,9 @@ private:
     void DoInputList(ImVec2 screenPos, int startIndex, int endIndex);
     void DoMainMenuBar();
 
+    void DoDeleteFrame(int frameIndex, int n = 1);
+    void DoInsertFrame(int frameIndex, int n = 1);
+
     void ChangeInputTo(int frameIndex, rgms::nes::ControllerState newInput);
     void ChangeButtonTo(int frameIndex, uint8_t button, bool onoff);
     void ChangeTargetTo(int frameIndex, bool byUserInteraction);
@@ -357,6 +399,7 @@ private:
     std::vector<rgms::nes::ControllerState> m_Inputs;
     int m_TargetIndex;
     int m_CurrentIndex;
+    int m_MarkerIndex;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -529,6 +572,8 @@ private:
 
     void SetVideoFrame(int videoIndex);
     void SetImageFromInputFrame(bool triggerNewFrame = true);
+
+    void HandleHotkeys();
 
 
 private:

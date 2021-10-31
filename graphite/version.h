@@ -28,7 +28,7 @@
 namespace graphite {
 
 #define GRAPHITE_VERSION_MAJOR 0
-#define GRAPHITE_VERSION_MINOR 3
+#define GRAPHITE_VERSION_MINOR 4
 
 inline std::string GraphiteVersionString() {
     return fmt::format("{:1d}.{:03d}", GRAPHITE_VERSION_MAJOR, GRAPHITE_VERSION_MINOR);

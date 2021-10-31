@@ -301,6 +301,69 @@ enum TASEditorInputsColumnIndices : int {
     FRAME_TEXT,
     BUTTONS,
 };
+HotkeyConfig::HotkeyConfig() {
+}
+
+HotkeyConfig::HotkeyConfig(SDL_Scancode sc, SDL_Keymod km, bool rpt, InputAction act)
+    : Scancode(sc)
+    , Keymod(km)
+    , Repeat(rpt)
+    , Action(act)
+{
+}
+
+static bool HotkeyKeymodSatisfied(SDL_Keymod hkm) {
+    static std::array<SDL_Keymod, 4> MODS = {
+        KMOD_CTRL, KMOD_SHIFT, KMOD_ALT, KMOD_GUI
+    };
+
+    SDL_Keymod km = SDL_GetModState();
+
+    for (auto & mod : MODS) {
+        if (hkm & mod) {
+            if (!(km & mod)) {
+                return false;
+            }
+        } else {
+            if (km & mod) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+static std::string HotkeyStringFromModCode(SDL_Scancode sc, SDL_Keymod km) {
+    std::ostringstream os;
+
+    // Don't really handle all cases but I mean that's fine for what we're dealing with
+    if (km & KMOD_CTRL) {
+        os << "ctrl-";
+    }
+    if (km & KMOD_ALT) {
+        os << "alt-";
+    }
+    if (km & KMOD_GUI) {
+        os << "win-";
+    }
+    if (km & KMOD_SHIFT) {
+        os << "shift-";
+    }
+
+    SDL_Keycode kc = SDL_GetKeyFromScancode(sc);
+    os << SDL_GetKeyName(kc);
+
+    return os.str();
+};
+
+static std::string GetHotkeyStringForAction(const InputAction& action, const std::vector<HotkeyConfig>& hotkeys) {
+    for (auto & hk : hotkeys) {
+        if (hk.Action == action) {
+            return HotkeyStringFromModCode(hk.Scancode, hk.Keymod);
+        }
+    }
+    return "";
+}
 
 InputsConfig InputsConfig::Defaults() {
     InputsConfig cfg;
@@ -312,17 +375,32 @@ InputsConfig InputsConfig::Defaults() {
     cfg.MaxInputSize = 25000;
     cfg.TextColor = IM_COL32(255, 255, 255, 128);
     cfg.HighlightTextColor = IM_COL32_WHITE;
-    cfg.ButtonColor = IM_COL32(215, 25, 25, 255);
+    cfg.ButtonColor = IM_COL32(215,  25,  25, 255);
+    cfg.MarkerColor = IM_COL32( 25,  25, 215, 255);
     cfg.StickyAutoScroll = true;
     cfg.VisibleButtons = 0b11111111;
 
     cfg.Hotkeys = {
-        {SDL_SCANCODE_1, true, InputAction::SMB_JUMP_EARLIER},
-        {SDL_SCANCODE_2, true, InputAction::SMB_JUMP_LATER},
-        {SDL_SCANCODE_3, true, InputAction::SMB_JUMP},
-        {SDL_SCANCODE_4, true, InputAction::SMB_JUMP_SHORTER},
-        {SDL_SCANCODE_5, true, InputAction::SMB_JUMP_LONGER},
+        {SDL_SCANCODE_1,  KMOD_NONE,  true, InputAction::SMB_JUMP_EARLIER},
+        {SDL_SCANCODE_2,  KMOD_NONE,  true, InputAction::SMB_JUMP_LATER},
+        {SDL_SCANCODE_2, KMOD_SHIFT, false, InputAction::SMB_REMOVE_LAST_JUMP},
+        {SDL_SCANCODE_3,  KMOD_NONE,  true, InputAction::SMB_JUMP},
+        {SDL_SCANCODE_3, KMOD_SHIFT, false, InputAction::SMB_FULL_JUMP},
+        {SDL_SCANCODE_4,  KMOD_NONE,  true, InputAction::SMB_JUMP_SHORTER},
+        {SDL_SCANCODE_4, KMOD_SHIFT, false, InputAction::SMB_REMOVE_LAST_JUMP},
+        {SDL_SCANCODE_5,  KMOD_NONE,  true, InputAction::SMB_JUMP_LONGER},
+
+        {SDL_SCANCODE_T,  KMOD_NONE, false, InputAction::SMB_START},
+
+        {SDL_SCANCODE_I,  KMOD_NONE,  true, InputAction::INSERT_FRAME},
+        {SDL_SCANCODE_I, KMOD_SHIFT, false, InputAction::SMB_INSERT_FRAMERULE},
+        {SDL_SCANCODE_D,  KMOD_NONE,  true, InputAction::DELETE_FRAME},
+        {SDL_SCANCODE_D, KMOD_SHIFT, false, InputAction::SMB_DELETE_FRAMERULE},
+
+        {SDL_SCANCODE_M,  KMOD_NONE, false, InputAction::SET_REMOVE_MARKER},
+        {SDL_SCANCODE_N,  KMOD_NONE, false, InputAction::GOTO_MARKER},
     };
+
 
     return cfg;
 }
@@ -342,6 +420,7 @@ InputsComponent::InputsComponent(rgmui::EventQueue* queue,
     , m_LockTarget(0)
     , m_CouldToggleLock(false)
     , m_TargetIndex(0)
+    , m_MarkerIndex(-1)
     , m_CurrentIndex(0)
     , m_OffsetMillis(0)
 {
@@ -389,9 +468,9 @@ void InputsComponent::HandleHotkeys() {
     auto& io = ImGui::GetIO();
     int dx = 0;
     if (!io.WantCaptureKeyboard) {
-        for (auto & [sc, repeat, action] : m_Config->Hotkeys) {
-            if (ImGui::IsKeyPressed(sc, repeat)) {
-                DoInputAction(action);
+        for (auto & hk: m_Config->Hotkeys) {
+            if (ImGui::IsKeyPressed(hk.Scancode, hk.Repeat) && HotkeyKeymodSatisfied(hk.Keymod)) {
+                DoInputAction(hk.Action);
             }
         }
     } 
@@ -602,6 +681,11 @@ void InputsComponent::DoInputLine(int frameIndex) {
         }
     }
 
+    // Draw Marker / Chevron
+    if (m_MarkerIndex == frameIndex) {
+        list->AddRectFilled(gul, glr, m_Config->MarkerColor, 2.0f);
+        list->AddRect(gul, glr, IM_COL32_WHITE, 2.0f);
+    }
     if (m_TargetIndex == frameIndex || m_CurrentIndex == frameIndex) {
         ImVec2 a = gul;
         ImVec2 b(glr.x - 3, p.y + m_LineSize.y / 2);
@@ -702,27 +786,48 @@ void InputsComponent::DoInputLine(int frameIndex) {
         if (ImGui::MenuItem(fmt::format("clear {}", frameIndex + 1).c_str())) {
             ChangeInputTo(frameIndex, 0x00);
         }
-        if (ImGui::MenuItem(fmt::format("insert before {}", frameIndex + 1).c_str())) {
-            if (frameIndex < m_Inputs.size()) {
-                std::vector<rgms::nes::ControllerState> inputs = m_Inputs;
-                inputs.insert(inputs.begin() + frameIndex, 0x00);
-                ChangeAllInputsTo(inputs);
-            }
+
+        std::string insertPrompt = fmt::format("insert before {}", frameIndex + 1);
+        std::string deletePrompt = fmt::format("delete {}", frameIndex + 1);
+        if (ImGui::MenuItem(insertPrompt.c_str())) {
+            DoInsertFrame(frameIndex);
         }
-        if (ImGui::MenuItem(fmt::format("delete {}", frameIndex + 1).c_str())) {
-            if (frameIndex < m_Inputs.size()) {
-                std::vector<rgms::nes::ControllerState> inputs = m_Inputs;
-                inputs.erase(inputs.begin() + frameIndex);
-                ChangeAllInputsTo(inputs);
+        if (ImGui::MenuItem(deletePrompt.c_str())) {
+            DoDeleteFrame(frameIndex);
+        }
+        if (ImGui::MenuItem(fmt::format("set marker {}", frameIndex + 1).c_str())) {
+            m_MarkerIndex = frameIndex;
+        }
+        if (m_MarkerIndex == frameIndex) {
+            if (ImGui::MenuItem("clear marker")) {
+                m_MarkerIndex = -1;
             }
         }
 
         ImGui::EndPopup();
     }
 
-
-
     ImGui::PopID();
+}
+
+void InputsComponent::DoDeleteFrame(int frameIndex, int n) {
+    if (frameIndex < m_Inputs.size()) {
+        std::vector<rgms::nes::ControllerState> inputs = m_Inputs;
+        for (int i = 0; i < n; i++) {
+            inputs.erase(inputs.begin() + frameIndex);
+        }
+        ChangeAllInputsTo(inputs);
+    }
+}
+
+void InputsComponent::DoInsertFrame(int frameIndex, int n) {
+    if (frameIndex < m_Inputs.size()) {
+        std::vector<rgms::nes::ControllerState> inputs = m_Inputs;
+        for (int i = 0; i < n; i++) {
+            inputs.insert(inputs.begin() + frameIndex, 0x00);
+        }
+        ChangeAllInputsTo(inputs);
+    }
 }
 
 std::pair<int, int> InputsComponent::FindPreviousJump() {
@@ -758,7 +863,7 @@ void InputsComponent::DoInputAction(InputAction action) {
         }
         case InputAction::SMB_JUMP_LATER: {
             auto [from, to] = FindPreviousJump();
-            if (from != to) {
+            if (from != to && to > (from + 1)) {
                 m_UndoRedo.ChangeInputTo(from, m_Inputs[from] & ~nes::Button::A);
             }
             break;
@@ -776,7 +881,7 @@ void InputsComponent::DoInputAction(InputAction action) {
         }
         case InputAction::SMB_JUMP_SHORTER: {
             auto [from, to] = FindPreviousJump();
-            if (from != to && to > 0) {
+            if (from != to && to > 0 && to > (from + 1)) {
                 m_UndoRedo.ChangeInputTo(to - 1, m_Inputs[to - 1] & ~nes::Button::A);
             }
             break;
@@ -788,6 +893,76 @@ void InputsComponent::DoInputAction(InputAction action) {
             }
             break;
         }
+        case InputAction::SMB_FULL_JUMP: {
+            if (m_TargetIndex >= 2 && m_Inputs.size() > (m_TargetIndex + 31)) {
+                int s = m_TargetIndex - 2;
+                if (m_Inputs[s] & nes::Button::A) {
+                    auto [from, to] = FindPreviousJump();
+                    s = from;
+                } 
+
+                int nchanges = 0;
+                for (int i = 0; i < 31; i++) {
+                    if (!(m_Inputs[s + i] & nes::Button::A)) {
+                        nchanges++;
+                        m_UndoRedo.ChangeInputTo(s + i, m_Inputs[s + i] | nes::Button::A);
+                    }
+                }
+                m_UndoRedo.ConsolidateLast(nchanges);
+            }
+            break;
+        }
+        case InputAction::SMB_START: {
+            if (m_TargetIndex >= 2) {
+                int t = m_TargetIndex - 2;
+                if (!(m_Inputs[t] & nes::Button::START)) {
+                    m_UndoRedo.ChangeInputTo(t, m_Inputs[t] | nes::Button::START);
+                }
+            }
+            break;
+        }
+        case InputAction::SMB_REMOVE_LAST_JUMP: {
+            auto [from, to] = FindPreviousJump();
+            if (from != to) {
+                for (int i = from; i < to; i++) {
+                    m_UndoRedo.ChangeInputTo(i, m_Inputs[i] & ~nes::Button::A);
+                }
+                m_UndoRedo.ConsolidateLast(to - from);
+            }
+            break;
+        }
+        case InputAction::SMB_INSERT_FRAMERULE: {
+            DoInsertFrame(m_TargetIndex, 21);
+            break;
+        }
+        case InputAction::SMB_DELETE_FRAMERULE: {
+            DoDeleteFrame(m_TargetIndex, 21);
+            break;
+        }
+        case InputAction::INSERT_FRAME: {
+            DoInsertFrame(m_TargetIndex);
+            break;
+        }
+        case InputAction::DELETE_FRAME: {
+            DoDeleteFrame(m_TargetIndex);
+            break;
+        }
+        case InputAction::SET_REMOVE_MARKER: {
+            if (m_MarkerIndex == m_TargetIndex) {
+                m_MarkerIndex = -1;
+            } else {
+                m_MarkerIndex = m_TargetIndex;
+            }
+            break;
+        }
+        case InputAction::GOTO_MARKER: {
+            if (m_MarkerIndex >= 0) {
+                ChangeTargetTo(m_MarkerIndex, true);
+            }
+            break;
+        }
+
+
         default:
             throw std::runtime_error("unhandled action!");
     }
@@ -1695,8 +1870,10 @@ void VideoComponent::SetBlankImage() {
 }
 
 void VideoComponent::SetOffset(int offset) {
-    m_Config->OffsetMillis = offset;
-    m_EventQueue->PublishI(EventType::OFFSET_SET_TO, offset);
+    if (m_Config->OffsetMillis != offset) {
+        m_Config->OffsetMillis = offset;
+        m_EventQueue->PublishI(EventType::OFFSET_SET_TO, offset);
+    }
 }
 
 void VideoComponent::UpdateOffset(int dx) {
@@ -1712,6 +1889,9 @@ void VideoComponent::UpdateOffset(int dx) {
         int o = m_Config->OffsetMillis + (ePts - oPts);
         SetOffset(o);
         FindTargetFrame(m_InputTarget);
+    } else if (endFrame == -1) {
+        SetOffset(0);
+        FindTargetFrame(m_InputTarget);
     }
 }
 
@@ -1719,7 +1899,21 @@ std::string VideoComponent::WindowName() {
     return "Video";
 }
 
+void VideoComponent::HandleHotkeys() {
+    auto& io = ImGui::GetIO();
+    if (!io.WantCaptureKeyboard) {
+        if (ImGui::IsKeyPressed(SDL_SCANCODE_COMMA, true) && rgmui::ShiftIsDown()) {
+            UpdateOffset(-1);
+        }
+        if (ImGui::IsKeyPressed(SDL_SCANCODE_PERIOD, true) && rgmui::ShiftIsDown()) {
+            UpdateOffset(1);
+        }
+    }
+}
+
 void VideoComponent::OnFrame() {
+    HandleHotkeys();
+
     if (m_CurrentVideoIndex == -1) {
         FindTargetFrame(0);
     }
@@ -1753,7 +1947,6 @@ void VideoComponent::OnFrame() {
         }
 
         if (m_CurrentVideoIndex >= 0 && m_CurrentVideoIndex < m_PTS.size()) {
-
             ImGui::PushItemWidth(120);
             if (ImGui::InputInt("sync", &m_Config->OffsetMillis)) {
                 SetOffset(m_Config->OffsetMillis);
@@ -2038,13 +2231,12 @@ void OverlayComponent::OnFrame() {
             m_Config->EdgeColor = ImGui::ColorConvertFloat4ToU32(c);
             m_EventQueue->Publish(EventType::REFRESH_CONFIG);
         }
-        if (rgmui::SliderFloatExt("Edge Min Threshold", &m_Config->EdgeMinThreshold, 0.0f, 300.0f)) {
+        if (rgmui::SliderFloatExt("edge min threshold", &m_Config->EdgeMinThreshold, 0.0f, 300.0f)) {
             m_EventQueue->Publish(EventType::REFRESH_CONFIG);
         }
-        if (rgmui::SliderFloatExt("Edge Max Threshold", &m_Config->EdgeMaxThreshold, 0.0f, 300.0f)) {
+        if (rgmui::SliderFloatExt("edge max threshold", &m_Config->EdgeMaxThreshold, 0.0f, 300.0f)) {
             m_EventQueue->Publish(EventType::REFRESH_CONFIG);
         }
-
     }
     ImGui::End();
 }
