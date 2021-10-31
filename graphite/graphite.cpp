@@ -899,7 +899,14 @@ void InputsComponent::DoInputAction(InputAction action) {
             break;
         }
         case InputAction::SMB_FULL_JUMP: {
-            if (m_TargetIndex >= 2 && m_Inputs.size() > (m_TargetIndex + 31)) {
+            if (m_TargetIndex >= 2 && m_Inputs.size() > (m_TargetIndex + 36)) {
+                // This would be properly based on the subspeed in $0057,
+                // if frame s - 1, ram[$0057] <= 15 or >= 25:
+                //   jump 32
+                // else:
+                //   jump 35
+                // (according to slither)
+                // But I don't really have access to the emulator here
                 int s = m_TargetIndex - 2;
                 if (m_Inputs[s] & nes::Button::A) {
                     auto [from, to] = FindPreviousJump();
@@ -907,7 +914,7 @@ void InputsComponent::DoInputAction(InputAction action) {
                 } 
 
                 int nchanges = 0;
-                for (int i = 0; i < 31; i++) {
+                for (int i = 0; i < 35; i++) {
                     if (!(m_Inputs[s + i] & nes::Button::A)) {
                         nchanges++;
                         m_UndoRedo.ChangeInputTo(s + i, m_Inputs[s + i] | nes::Button::A);
