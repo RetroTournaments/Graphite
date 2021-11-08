@@ -83,7 +83,7 @@ cd C:\repos\opencv
 mkdir build64
 cd build64
 cmake -D CMAKE_BUILD_TYPE=RELEASE -D BUILD_opencv_world=ON -A x64 ..
-msbuild INSTALL.vcxprox /p:Configuration=Release
+msbuild INSTALL.vcxproj /p:Configuration=Release
 ```
 
 
@@ -94,7 +94,7 @@ cd C:\repos\opencv
 mkdir build32
 cd build64
 cmake -D CMAKE_BUILD_TYPE=RELEASE -D BUILD_opencv_world=ON -A Win32 ..
-msbuild INSTALL.vcxprox /p:Configuration=Release
+msbuild INSTALL.vcxproj /p:Configuration=Release
 
 ```
 
