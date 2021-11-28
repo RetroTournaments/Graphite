@@ -819,6 +819,7 @@ void InputsComponent::DoDeleteFrame(int frameIndex, int n) {
     if (frameIndex < m_Inputs.size()) {
         std::vector<rgms::nes::ControllerState> inputs = m_Inputs;
         for (int i = 0; i < n; i++) {
+            if (frameIndex >= inputs.size()) break;
             inputs.erase(inputs.begin() + frameIndex);
         }
         ChangeAllInputsTo(inputs);
@@ -1329,6 +1330,9 @@ UndoRedo::Change::Change(int _frameIndex, nes::ControllerState _oldState, nes::C
 }
 
 void UndoRedo::ChangeInputTo(int frameIndex, nes::ControllerState newState) {
+    if (m_Inputs->size() <= frameIndex) {
+        m_Inputs->resize(frameIndex + 1, 0x00);
+    }
     m_Changes.resize(m_ChangeIndex);
     m_Changes.emplace_back(frameIndex, m_Inputs->at(frameIndex), newState);
 
@@ -1338,6 +1342,9 @@ void UndoRedo::ChangeInputTo(int frameIndex, nes::ControllerState newState) {
 }
 
 void UndoRedo::IntChangeInput(int frameIndex, nes::ControllerState newState) {
+    if (frameIndex > m_Inputs->size()) {
+        m_Inputs->resize(frameIndex + 1, 0x00);
+    }
     m_Inputs->at(frameIndex) = newState;
     m_EventQueue->Publish(EventType::INPUT_SET_TO, 
             std::make_shared<InputChangeEvent>(frameIndex, newState));
@@ -1349,7 +1356,6 @@ void UndoRedo::Undo() {
         do {
             m_ChangeIndex--;
             assert(m_ChangeIndex >= 0);
-
 
             IntChangeInput(m_Changes[m_ChangeIndex].FrameIndex,
                     m_Changes[m_ChangeIndex].OldState);
