@@ -345,6 +345,7 @@ void ReadFM2File(std::istream& is,
 void WriteFM2File(std::ostream& os,
         const std::vector<nes::ControllerState>& inputs,
         const FM2Header& header);
+std::string ControllerStateToFM2Line(const nes::ControllerState& state);
 
 }
 

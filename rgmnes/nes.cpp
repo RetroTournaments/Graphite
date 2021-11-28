@@ -608,6 +608,22 @@ void rgms::nes::ReadFM2File(std::istream& is,
 
 }
 
+std::string rgms::nes::ControllerStateToFM2Line(const nes::ControllerState& state) {
+    static const std::array<char, 8> BUTTONS {
+        'R', 'L', 'D', 'U', 'T', 'S', 'B', 'A',
+    };
+    std::string v = "|0|........|||";
+    std::ostringstream os;
+
+    uint8_t in8 = static_cast<uint8_t>(state);
+    for (int i = 0; i < 8; i++) {
+        if (in8 & (1 << (7 - i))) {
+            v[i + 3] = BUTTONS[i];
+        }
+    }
+    return v;
+}
+
 void rgms::nes::WriteFM2File(std::ostream& os,
         const std::vector<ControllerState>& inputs,
         const FM2Header& header) {
@@ -631,21 +647,9 @@ void rgms::nes::WriteFM2File(std::ostream& os,
         os << line << "\n";
     }
 
-    static const std::array<char, 8> BUTTONS {
-        'R', 'L', 'D', 'U', 'T', 'S', 'B', 'A',
-    };
 
     auto WriteInputLine = [&](const nes::ControllerState& input){
-        os << "|0|";
-        uint8_t in8 = static_cast<uint8_t>(input);
-        for (int i = 0; i < 8; i++) {
-            if (in8 & (1 << (7 - i))) {
-                os << BUTTONS[i];
-            } else {
-                os << '.';
-            }
-        }
-        os << "|||\n";
+        os << ControllerStateToFM2Line(input) << "\n";
     };
 
     WriteInputLine(0);

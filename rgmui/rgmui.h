@@ -188,6 +188,7 @@ bool ArrowKeyHelperInFrame(int* dx, int* dy, int shiftMultiplier);
 // Favorite is : ImGuiInputTextFlags_EnterReturnsTrue
 bool InputText(const char* label, std::string* str, 
         ImGuiInputTextFlags flags = ImGuiInputTextFlags_None);
+bool InputColor(const char* label, ImU32* color);
 
 template <typename... T>
 void TextFmt(fmt::format_string<T...> fmt, T&&... args) {

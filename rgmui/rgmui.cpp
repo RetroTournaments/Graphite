@@ -433,6 +433,15 @@ bool rgms::rgmui::InputText(const char* label, std::string* str,
     return ret;
 }
 
+bool rgms::rgmui::InputColor(const char* label, ImU32* color) {
+    ImVec4 c = ImGui::ColorConvertU32ToFloat4(*color);
+    if (ImGui::ColorEdit3(label, &c.x)) {
+        *color = ImGui::ColorConvertFloat4ToU32(c);
+        return true;
+    }
+    return false;
+}
+
 template <typename T>
 static bool SliderExt(T* v, T min, T max, bool allowArrowKeys, bool allowMouseWheel, T singleMove, T shiftMult) {
     bool changed = false;
