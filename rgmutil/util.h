@@ -872,6 +872,26 @@ template <typename T>
 T Lerp(T x, T x0, T x1, T y0, T y1) {
     return y0 + (x - x0) * (y1 - y0) / (x1 - x0);
 }
+template <typename T> // x already between 0.0 and 1.0
+T Lerp2(T x, T y0, T y1) {
+    return y0 + x * (y1 - y0);
+}
+
+
+////////////////////////////////////////////////////////////////////////////////
+// Colormaps
+////////////////////////////////////////////////////////////////////////////////
+// Just the barest stuff here, some maps hardcoded in util.cpp accessed via
+// double between 0 and 1. RGB order
+enum class ColorMapType {
+    BREWER_RDBU, // Diverging
+    BREWER_YLORBR, // Sequential
+    BREWER_BLUES, // Sequential
+    BREWER_REDS, // Sequential
+    BREWER_GREENS, // Sequential
+};
+const std::vector<std::array<uint8_t, 3>>& GetColorMapColors(ColorMapType cmap);
+std::array<uint8_t, 3> ColorMapColor(ColorMapType cmap, double v);
 
 
 }

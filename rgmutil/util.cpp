@@ -282,3 +282,116 @@ std::string rgms::util::ReadFileToString(const std::string& path) {
     return std::string(std::istreambuf_iterator<char>(ifs), std::istreambuf_iterator<char>());
 }
 
+////////////////////////////////////////////////////////////////////////////////
+
+const std::vector<std::array<uint8_t, 3>>& rgms::util::GetColorMapColors(ColorMapType cmap) {
+    static std::vector<std::array<uint8_t, 3>> BREWER_RDBU = {
+        {0x67, 0x00, 0x1f},
+        {0xb2, 0x18, 0x2b},
+        {0xd6, 0x60, 0x4d},
+        {0xf4, 0xa5, 0x82},
+        {0xfd, 0xdb, 0xc7},
+        {0xf7, 0xf7, 0xf7},
+        {0xd1, 0xe5, 0xf0},
+        {0x92, 0xc5, 0xde},
+        {0x43, 0x93, 0xc3},
+        {0x21, 0x66, 0xac},
+        {0x05, 0x30, 0x61},
+    };
+
+    static std::vector<std::array<uint8_t, 3>> BREWER_YLORBR = {
+        {0xff, 0xff, 0xe5},
+        {0xff, 0xf7, 0xbc},
+        {0xfe, 0xe3, 0x91},
+        {0xfe, 0xc4, 0x4f},
+        {0xfe, 0x99, 0x29},
+        {0xec, 0x70, 0x14},
+        {0xcc, 0x4c, 0x02},
+        {0x99, 0x34, 0x04},
+        {0x66, 0x25, 0x06},
+    };
+    static std::vector<std::array<uint8_t, 3>> BREWER_BLUES = {
+        {0xf7, 0xfb, 0xff},
+        {0xde, 0xeb, 0xf7},
+        {0xc6, 0xdb, 0xef},
+        {0x9e, 0xca, 0xe1},
+        {0x6b, 0xae, 0xd6},
+        {0x42, 0x92, 0xc6},
+        {0x21, 0x71, 0xb5},
+        {0x08, 0x51, 0x9c},
+        {0x08, 0x30, 0x6b},
+    };
+    static std::vector<std::array<uint8_t, 3>> BREWER_REDS = {
+        {0xff, 0xf5, 0xf0},
+        {0xfe, 0xe0, 0xd2},
+        {0xfc, 0xbb, 0xa1},
+        {0xfc, 0x92, 0x72},
+        {0xfb, 0x6a, 0x4a},
+        {0xef, 0x3b, 0x2c},
+        {0xcb, 0x18, 0x1d},
+        {0xa5, 0x0f, 0x15},
+        {0x67, 0x00, 0x0d},
+    };
+    static std::vector<std::array<uint8_t, 3>> BREWER_GREENS = {
+        {0xf7, 0xfc, 0xf5},
+        {0xe5, 0xf5, 0xe0},
+        {0xc7, 0xe9, 0xc0},
+        {0xa1, 0xd9, 0x9b},
+        {0x74, 0xc4, 0x76},
+        {0x41, 0xab, 0x5d},
+        {0x23, 0x8b, 0x45},
+        {0x00, 0x6d, 0x2c},
+        {0x00, 0x44, 0x1b},
+    };
+
+    switch (cmap) {
+        case ColorMapType::BREWER_RDBU: {
+            return BREWER_RDBU;
+        } break;
+        case ColorMapType::BREWER_YLORBR: {
+            return BREWER_YLORBR;
+        } break;
+        case ColorMapType::BREWER_BLUES: {
+            return BREWER_BLUES;
+        } break;
+        case ColorMapType::BREWER_REDS: {
+            return BREWER_REDS;
+        } break;
+        case ColorMapType::BREWER_GREENS: {
+            return BREWER_GREENS;
+        } break;
+    };
+
+    throw std::invalid_argument("unknown color map type");
+    return BREWER_YLORBR;
+}
+
+std::array<uint8_t, 3> rgms::util::ColorMapColor(ColorMapType cmap, double v) {
+    const std::vector<std::array<uint8_t, 3>>& cs = GetColorMapColors(cmap);
+    if (cs.size() < 2) {
+        throw std::invalid_argument("invalid color map");
+    }
+
+    if (v <= 0.0) {
+        return cs.front();
+    }
+    if (v >= 1.0) {
+        return cs.back();
+    }
+
+    std::vector<double> ls(cs.size());
+    InplaceLinspaceBase(ls.begin(), ls.end(), 0.0, 1.0);
+    auto i = std::lower_bound(ls.begin(), ls.end(), v);
+
+    size_t li = std::distance(ls.begin(), i);
+
+    double q = Lerp(v, ls[li-1], ls[li], 0.0, 1.0);
+
+    std::array<uint8_t, 3> result;
+    for (int j = 0; j < 3; j++) {
+        result[j] = static_cast<uint8_t>(std::round(Lerp2(q,
+                        static_cast<double>(cs[li-1][j]), static_cast<double>(cs[li][j]))));
+    }
+
+    return result;
+}
