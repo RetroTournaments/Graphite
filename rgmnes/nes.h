@@ -149,7 +149,6 @@ public:
     virtual void PPUPeekPatternTable(int tableIndex, PatternTable* table) const;
     virtual void PPUPeekNameTable(int tableIndex, NameTable* table) const;
     virtual void PPUPeekFramePalette(FramePalette* fpal) const;
-    virtual void PPUPeekScroll(uint8_t* xfine, uint8_t* yfine) const = 0;
 
     virtual uint8_t ScreenPeekPixel(int x, int y) const = 0;
     virtual void ScreenPeekFrame(Frame* frame) const;

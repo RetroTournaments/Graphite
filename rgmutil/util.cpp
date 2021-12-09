@@ -251,6 +251,10 @@ void rgms::util::ForFileOfExtensionInDirectory(const std::string& directory,
     }
 }
 
+bool rgms::util::FileExists(const std::string& path) {
+    return fs::exists(path);
+}
+
 int rgms::util::ReadFileToVector(const std::string& path, std::vector<uint8_t>* contents) {
     std::ifstream ifs(path, std::ios::in | std::ios::binary);
     if (!ifs.good()) {

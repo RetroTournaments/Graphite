@@ -166,14 +166,6 @@ uint8_t NestopiaNESEmulator::PPUPeek8(uint16_t addr) const {
     return 0x00;
 }
 
-void NestopiaNESEmulator::PPUPeekScroll(uint8_t* xfine, uint8_t* yfine) const {
-    Nes::Core::Machine& machine(const_cast<Nes::Api::Emulator&>(m_Emulator));
-    Nes::Core::Ppu& ppu = machine.ppu;
-
-    *xfine = static_cast<uint8_t>(ppu.scroll.xFine % 256);
-    *yfine = 0; // TODO :(
-}
-
 uint8_t NestopiaNESEmulator::OAMPeek8(uint8_t addr) const {
     Nes::Core::Machine& machine(const_cast<Nes::Api::Emulator&>(m_Emulator));
     const Nes::Core::Ppu::Oam& oam = machine.ppu.oam;
