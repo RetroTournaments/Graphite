@@ -420,11 +420,13 @@ bool rgms::rgmui::InputText(const char* label, std::string* str,
         if (ImGui::Selectable("copy")) {
             ImGui::SetClipboardText(str->c_str());
         }
-        if (ImGui::Selectable("paste")) {
-            *str = ImGui::GetClipboardText();
-        }
-        if (ImGui::Selectable("clear")) {
-            *str = "";
+        if (!(flags & ImGuiInputTextFlags_ReadOnly)) {
+            if (ImGui::Selectable("paste")) {
+                *str = ImGui::GetClipboardText();
+            }
+            if (ImGui::Selectable("clear")) {
+                *str = "";
+            }
         }
         ImGui::EndPopup();
     }
@@ -548,12 +550,18 @@ MatAnnotator::MatAnnotator(const char* label, const cv::Mat& mat, float scale, V
     , m_Origin(origin)
     , m_Clipped(clipped)
 {
+    auto beforePos = ImGui::GetCursorScreenPos();
     Mat(label, mat);
+    auto afterPos = ImGui::GetCursorScreenPos();
     m_BottomRight.x = m_OriginalCursorPosition.x + mat.cols * scale;
     m_BottomRight.y = m_OriginalCursorPosition.y + mat.rows * scale;
 
     m_IsHovered = ImGui::IsItemHovered();
 
+    ImGui::SetCursorScreenPos(beforePos);
+    ImGui::InvisibleButton(fmt::format("{}_invis_button", label).c_str(),
+            ImVec2(static_cast<float>(mat.cols), static_cast<float>(mat.rows)));
+    ImGui::SetCursorScreenPos(afterPos);
 }
 
 MatAnnotator::~MatAnnotator() {
