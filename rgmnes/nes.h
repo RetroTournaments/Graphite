@@ -67,6 +67,7 @@ typedef std::array<uint8_t, PATTERNTABLE_SIZE> PatternTable;
 
 // Name tables (often updated by CPU)
 inline constexpr int NAMETABLE_SIZE = 0x0400;
+inline constexpr int NAMETABLE_ATTRIBUTE_OFFSET = 0x03c0;
 typedef std::array<uint8_t, NAMETABLE_SIZE> NameTable;
 
 // The NES does not allow the full palette to be used at once
@@ -82,6 +83,15 @@ typedef std::array<uint8_t, FRAMEPALETTE_SIZE> FramePalette;
 
 inline constexpr int RAM_SIZE = 0x0800;
 typedef std::array<uint8_t, RAM_SIZE> Ram;
+
+inline constexpr int OAM_SIZE = 64 * 4;
+typedef std::array<uint8_t, OAM_SIZE> Oam;
+struct OamEntry {
+    uint8_t y;
+    uint8_t tile_index;
+    uint8_t attributes;
+    uint8_t x;
+};
 
 
 typedef uint8_t ControllerState;
