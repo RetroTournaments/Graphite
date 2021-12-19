@@ -24,7 +24,8 @@ Linux
 Install dependencies 
 ```
 sudo apt install build-essential cmake git ninja-build \
-    libavcodec-dev libavformat-dev libswscale-dev libv4l-dev
+    libavcodec-dev libavformat-dev libswscale-dev libv4l-dev \
+    mesa-common-dev xorg-dev
 ```
 
 
