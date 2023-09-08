@@ -124,7 +124,7 @@ namespace Nes
 				}
 			};
 
-		public:
+		private:
 
 			struct Chr : ChrMem
 			{
@@ -186,6 +186,7 @@ namespace Nes
 			NST_FORCE_INLINE uint FetchSpPattern() const;
 			NST_FORCE_INLINE void FetchBgPattern0();
 			NST_FORCE_INLINE void FetchBgPattern1();
+			NST_FORCE_INLINE void UpdateDecay(byte);
 
 			NST_FORCE_INLINE void EvaluateSpritesEven();
 			NST_FORCE_INLINE void EvaluateSpritesOdd();
@@ -289,6 +290,7 @@ namespace Nes
 				const byte padding1;
 			};
 
+		public:
 			struct Palette
 			{
 				enum
@@ -303,6 +305,7 @@ namespace Nes
 				byte ram[SIZE];
 			};
 
+		private:
 			struct Output
 			{
 				explicit Output(Video::Screen::Pixel*);
@@ -314,6 +317,7 @@ namespace Nes
 				uint bgColor;
 			};
 
+		public:
 			struct Oam
 			{
 				Oam();
@@ -364,6 +368,7 @@ namespace Nes
 				Output output[MAX_LINE_SPRITES];
 			};
 
+		private:
 			struct NameTable
 			{
 				enum
@@ -407,6 +412,12 @@ namespace Nes
 				Cycle reset;
 			}   cycles;
 
+			struct
+			{
+				Cycle timestamp[8];
+				Cycle rd2007;
+			}   decay;
+
 			Io io;
 			Regs regs;
 			Scroll scroll;
@@ -417,14 +428,16 @@ namespace Nes
 			int scanline_sleep;
 		public:
 			Output output;
-		public:
+		private:
 			PpuModel model;
 			Hook hActiveHook;
 			Hook hBlankHook;
 			const byte* rgbMap;
 			const byte* yuvMap;
+		public:
 			Oam oam;
 			Palette palette;
+		private:
 			NameTable nameTable;
 			const TileLut tileLut;
 			Video::Screen screen;
