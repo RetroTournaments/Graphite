@@ -60,21 +60,21 @@ jobs:
 
       - name: Install opencv
         run: |
-          cd $env:GITHUB_WORKSPACE/3rd/opencv && \
-          mkdir build && \
-          cd build && \
-          cmake -D CMAKE_BUILD_TYPE=RELEASE -D BUILD_opencv_world=ON -A x64 .. && \
+          cd $env:GITHUB_WORKSPACE/3rd/opencv
+          mkdir build
+          cd build
+          cmake -D CMAKE_BUILD_TYPE=RELEASE -D BUILD_opencv_world=ON -A x64 ..
           msbuild INSTALL.vcxproj /p:Configuration=Release
 
       - name: Prepare build directory
         run: |
-          mkdir $env:GITHUB_WORKSPACE/build && \
-          cd $env:GITHUB_WORKSPACE/build && \
+          mkdir $env:GITHUB_WORKSPACE/build
+          cd $env:GITHUB_WORKSPACE/build
           cmake -D OpenCV_DIR="$env:GITHUB_WORKSPACE/3rd/opencv/build/install" -A x64 ..
 
       - name: Build app for release
         run: |
-          cd $env:GITHUB_WORKSPACE/build && \
+          cd $env:GITHUB_WORKSPACE/build
           msbuild ALL_BUILD.vcxproj /p:Configuration=Release
 
       - name: zip the graphite binary
