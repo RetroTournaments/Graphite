@@ -1,0 +1,47 @@
+name: linux_x64
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Actions Repository
+        uses: actions/checkout@v3
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update && \
+          sudo apt install build-essential cmake git ninja-build \
+            libavcodec-dev libavformat-dev libswscale-dev libv4l-dev \
+            mesa-common-dev xorg-dev libopencv-dev
+
+      - name: Prepare build directory
+        run: |
+          mkdir ${GITHUB_WORKSPACE}/build && \
+          cd ${GITHUB_WORKSPACE}/build && \
+          cmake -G Ninja ..
+
+      - name: build
+        run: |
+          cd ${GITHUB_WORKSPACE}/build && \
+          ninja
+
+      - name: tar gz the graphite binary
+        if: success()
+        run: |
+          cd ${GITHUB_WORKSPACE}/build/graphite && \
+          tar -czvf ${GITHUB_WORKSPACE}/graphite-linux-x86_64.tar.gz graphite
+
+      - name: Upload artifacts
+        uses: ncipollo/release-action@v1
+        with:
+          commit: main
+          tag: ${{ github.run_number }}
+          artifacts: "graphite-linux-x86_64.tar.gz"
