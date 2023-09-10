@@ -64,8 +64,9 @@ jobs:
 
       - name: Install opencv
         run: |
+          cd $env:GITHUB_WORKSPACE
           wget https://github.com/opencv/opencv/releases/download/4.8.0/opencv-4.8.0-windows.exe
-          7z x opencv-4.8.0-windows.exe -o$env:GITHUB_WORKSPACE/3rd/
+          7z x opencv-4.8.0-windows.exe -o3rd
 
       - name: Prepare build directory
         run: |
@@ -81,7 +82,7 @@ jobs:
       - name: zip the graphite binary
         if: success()
         run: |
-          mkdir ${GITHUB_WORKSPACE}/release
+          mkdir $env:GITHUB_WORKSPACE/release
           cp $env:GITHUB_WORKSPACE/build/graphite/Release/*.exe ${GITHUB_WORKSPACE}/release
           cp $env:GITHUB_WORKSPACE/3rd/opencv/build/bin/Release/opencv_world*.dll ${GITHUB_WORKSPACE}/release
           cd $env:GITHUB_WORKSPACE/release
