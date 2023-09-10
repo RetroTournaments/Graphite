@@ -58,14 +58,14 @@ jobs:
       - name: Add msbuild to PATH
         uses: microsoft/setup-msbuild@v1.1
 
+      - name: install 7zip
+        run: |
+          choco install 7zip wget -y
+
       - name: Install opencv
         run: |
           wget https://github.com/opencv/opencv/releases/download/4.8.0/opencv-4.8.0-windows.exe
           7z x opencv-4.8.0-windows.exe -o$env:GITHUB_WORKSPACE/3rd/
-
-      - name: install 7zip
-        run: |
-          choco install 7zip wget -y
 
       - name: Prepare build directory
         run: |
