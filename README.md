@@ -25,28 +25,7 @@ Install dependencies
 ```
 sudo apt install build-essential cmake git ninja-build \
     libavcodec-dev libavformat-dev libswscale-dev libv4l-dev \
-    mesa-common-dev xorg-dev
-```
-
-Install opencv
-
-```
-cd ~/repos/
-git clone https://github.com/opencv/opencv.git
-git clone https://github.com/opencv/opencv_contrib.git
-
-cd ~/repos/opencv
-mkdir build && cd build
-cmake -D CMAKE_BUILD_TYPE=RELEASE \
-    -D CMAKE_INSTALL_PREFIX=/usr/local \
-    -D INSTALL_C_EXAMPLES=ON \
-    -D INSTALL_PYTHON_EXAMPLES=ON \
-    -D OPENCV_GENERATE_PKGCONFIG=ON \
-    -D OPENCV_EXTRA_MODULES_PATH=~/repos/opencv_contrib/modules \
-    -D BUILD_EXAMPLES=ON ..
-
-make -j8
-sudo make install
+    mesa-common-dev xorg-dev libopencv-dev
 ```
 
 #### Build
@@ -94,7 +73,7 @@ msbuild INSTALL.vcxproj /p:Configuration=Release
 
 cd C:\repos\opencv
 mkdir build32
-cd build64
+cd build32
 cmake -D CMAKE_BUILD_TYPE=RELEASE -D BUILD_opencv_world=ON -A Win32 ..
 msbuild INSTALL.vcxproj /p:Configuration=Release
 ```

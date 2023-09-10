@@ -1,4 +1,4 @@
-name: linux_x64
+name: graphite-ci
 
 on:
   push:
