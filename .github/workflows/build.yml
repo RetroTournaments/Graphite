@@ -94,7 +94,7 @@ jobs:
 
           cp $env:GITHUB_WORKSPACE/build/graphite/Release/*.exe .
           cp $env:GITHUB_WORKSPACE/3rd/opencv/build/x64/vc16/bin/opencv_world480.dll .
-          cp $env:GITHUB_WORKSPACE/3rd/opencv/bin/opencv_videoio_ffmpeg480_64.dll .
+          cp $env:GITHUB_WORKSPACE/3rd/opencv/build/bin/opencv_videoio_ffmpeg480_64.dll .
           cp $env:GITHUB_WORKSPACE/build/3rd/SDL/Release/SDL2.dll .
 
           Compress-Archive -Path ./* -DestinationPath $env:GITHUB_WORKSPACE/graphite-windows-x86_64.zip
