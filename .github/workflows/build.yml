@@ -83,10 +83,16 @@ jobs:
         if: success()
         run: |
           mkdir $env:GITHUB_WORKSPACE/release
-          cp $env:GITHUB_WORKSPACE/build/graphite/Release/*.exe ${GITHUB_WORKSPACE}/release
-          cp $env:GITHUB_WORKSPACE/3rd/opencv/build/x64/vc16/bin/opencv_world480.dll ${GITHUB_WORKSPACE}/release
           cd $env:GITHUB_WORKSPACE/release
-          Compress-Archive -Path $env:GITHUB_WORKSPACE/release/* -DestinationPath $env:GITHUB_WORKSPACE/graphite-windows-x86_64.zip
+
+          cp $env:GITHUB_WORKSPACE/build/graphite/Release/*.exe .
+          cp $env:GITHUB_WORKSPACE/3rd/opencv/build/x64/vc16/bin/opencv_world480.dll .
+
+          Compress-Archive -Path ./* -DestinationPath $env:GITHUB_WORKSPACE/graphite-windows-x86_64.zip
+
+          cd $env:GITHUB_WORKSPACE
+
+          dir
 
       - name: Collect artifacts
         if: success()
@@ -107,6 +113,10 @@ jobs:
     steps:
       - name: Download artifacts
         uses: actions/download-artifact@v3
+
+      - name: Show directory structure
+        run: |
+          ls -R
 
       - name: Upload artifacts
         uses: ncipollo/release-action@v1
