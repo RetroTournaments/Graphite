@@ -6,10 +6,8 @@ on:
       - master
 
 jobs:
-  build:
+  build_linux_x64:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
 
     steps:
       - name: Checkout Actions Repository
@@ -41,9 +39,76 @@ jobs:
           cd ${GITHUB_WORKSPACE}/build/graphite && \
           tar -czvf ${GITHUB_WORKSPACE}/graphite-linux-x86_64.tar.gz graphite
 
+      - name: Collect artifacts
+        if: success()
+        uses: actions/upload-artifact@v2
+        with:
+          name: graphite-linux-x86_64
+          path: graphite-linux-x86_64.tar.gz
+
+  build_window_x64:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Actions Repository
+        uses: actions/checkout@v3
+        with:
+          submodules: "recursive"
+
+      - name: Add msbuild to PATH
+        uses: microsoft/setup-msbuild@v1.1
+
+      - name: Install opencv
+        run: |
+          cd $env:GITHUB_WORKSPACE/3rd/opencv && \
+          mkdir build && \
+          cd build && \
+          cmake -D CMAKE_BUILD_TYPE=RELEASE -D BUILD_opencv_world=ON -A x64 .. && \
+          msbuild INSTALL.vcxproj /p:Configuration=Release
+
+      - name: Prepare build directory
+        run: |
+          mkdir $env:GITHUB_WORKSPACE/build && \
+          cd $env:GITHUB_WORKSPACE/build && \
+          cmake -D OpenCV_DIR="$env:GITHUB_WORKSPACE/3rd/opencv/build/install" -A x64 ..
+
+      - name: Build app for release
+        run: |
+          cd $env:GITHUB_WORKSPACE/build && \
+          msbuild ALL_BUILD.vcxproj /p:Configuration=Release
+
+      - name: zip the graphite binary
+        if: success()
+        run: |
+          mkdir ${GITHUB_WORKSPACE}/release
+          cp $env:GITHUB_WORKSPACE/build/graphite/Release/*.exe ${GITHUB_WORKSPACE}/release
+          cp $env:GITHUB_WORKSPACE/3rd/opencv/build/bin/Release/opencv_world*.dll ${GITHUB_WORKSPACE}/release
+          cd $env:GITHUB_WORKSPACE/release
+          Compress-Archive -Path $env:GITHUB_WORKSPACE/release/* -DestinationPath $env:GITHUB_WORKSPACE/graphite-windows-x86_64.zip
+
+      - name: Collect artifacts
+        if: success()
+        uses: actions/upload-artifact@v2
+        with:
+          name: graphite-windows-x86_64
+          path: graphite-windows-x86_64.zip
+
+  release:
+    needs:
+      - build_linux_x64
+      - build_window_x64
+
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+
       - name: Upload artifacts
         uses: ncipollo/release-action@v1
         with:
           commit: master
           tag: ${{ github.run_number }}
-          artifacts: "graphite-linux-x86_64.tar.gz"
+          artifacts: "graphite-linux-x86_64/graphite-linux-x86_64.tar.gz,graphite-windows-x86_64/graphite-windows-x86_64.zip"
