@@ -99,7 +99,7 @@ void LibAVVideoSource::Open() {
 
         avctx->pkt_timebase = m_AVFormatContext->streams[i]->time_base;
 
-        AVCodec* codec = avcodec_find_decoder(avctx->codec_id);
+        const AVCodec* codec = avcodec_find_decoder(avctx->codec_id);
         if (avctx->codec_type == AVMEDIA_TYPE_VIDEO) {
             ret = avcodec_open2(avctx, codec, nullptr);
             if (ret != 0) return ReportError("avcodec_open2", ret, ErrorState::CAN_NOT_OPEN_SOURCE);
