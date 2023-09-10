@@ -103,7 +103,7 @@
 #include "NstBoardUnlEdu2000.hpp"
 #include "NstBoardUnlKingOfFighters96.hpp"
 #include "NstBoardUnlKingOfFighters97.hpp"
-#include "NstBoardUnlMmc3BigPrgRom.hpp"
+// #include "NstBoardUnlMmc3BigPrgRom.hpp"
 #include "NstBoardUnlMortalKombat2.hpp"
 #include "NstBoardUnlN625092.hpp"
 #include "NstBoardUnlRetX7Gbl.hpp"
@@ -3929,7 +3929,7 @@ namespace Nes
 					// case Type::UNL_FS304                  : return new Waixing::Fs304(c);
 					case Type::UNL_KINGOFFIGHTERS96       : return new Unlicensed::KingOfFighters96(c);
 					case Type::UNL_KINGOFFIGHTERS97       : return new Unlicensed::KingOfFighters97(c);
-					case Type::UNL_MMC3BIGPRGROM          : return new Unlicensed::Mmc3BigPrgRom(c);
+					// case Type::UNL_MMC3BIGPRGROM          : return new Unlicensed::Mmc3BigPrgRom(c);
 					case Type::UNL_MORTALKOMBAT2          : return new Unlicensed::MortalKombat2(c);
 					case Type::UNL_N625092                : return new Unlicensed::N625092(c);
 					// case Type::UNL_RETX7GBL               : return new Unlicensed::RetX7Gbl(c);
