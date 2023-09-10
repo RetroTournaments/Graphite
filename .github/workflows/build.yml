@@ -84,7 +84,7 @@ jobs:
         run: |
           mkdir $env:GITHUB_WORKSPACE/release
           cp $env:GITHUB_WORKSPACE/build/graphite/Release/*.exe ${GITHUB_WORKSPACE}/release
-          cp $env:GITHUB_WORKSPACE/3rd/opencv/build/bin/Release/opencv_world*.dll ${GITHUB_WORKSPACE}/release
+          cp $env:GITHUB_WORKSPACE/3rd/opencv/build/x64/vc16/bin/opencv_world480.dll ${GITHUB_WORKSPACE}/release
           cd $env:GITHUB_WORKSPACE/release
           Compress-Archive -Path $env:GITHUB_WORKSPACE/release/* -DestinationPath $env:GITHUB_WORKSPACE/graphite-windows-x86_64.zip
 
