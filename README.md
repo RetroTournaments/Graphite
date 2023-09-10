@@ -103,7 +103,7 @@ msbuild INSTALL.vcxproj /p:Configuration=Release
 
 ```
 cd C:\repos
-git clone --recurse-submodules https://gitlab.com/FlibidyDibidy/graphite.git
+git clone --recurse-submodules https://github.com/RetroTournaments/Graphite.git
 
 "C:\Program Files (x86)\Microsoft Visual Studio\2019\Community\VC\Auxiliary\Build\vcvarsall.bat" amd64
 cd C:\repos\graphite
