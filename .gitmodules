@@ -16,6 +16,3 @@
 [submodule "3rd/json"]
 	path = 3rd/json
 	url = https://github.com/nlohmann/json.git
-[submodule "3rd/opencv"]
-	path = 3rd/opencv
-	url = https://github.com/opencv/opencv.git
