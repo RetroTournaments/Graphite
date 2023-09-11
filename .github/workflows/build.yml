@@ -1,13 +1,16 @@
 name: graphite-ci
 
 on:
-  push:
-    branches:
-      - master
+  workflow_dispatch:
+    inputs:
+      name:
+        description: 'Release name like: v0.001'
+        required: true
+        type: string
 
 jobs:
   build_linux_x64:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
 
     steps:
       - name: Checkout Actions Repository
@@ -132,4 +135,5 @@ jobs:
         with:
           commit: master
           tag: ${{ github.run_number }}
+          name: ${{ inputs.name }}
           artifacts: "graphite-linux-x86_64/graphite-x86_64.AppImage,graphite-windows-x86_64/graphite-windows-x86_64.zip"
