@@ -20,11 +20,6 @@
 //
 ////////////////////////////////////////////////////////////////////////////////
 
-TODO this file is not setup, but it is approximately what I used to morph inputs
-in place as I consider updating carbon to actually work for other people !
-(by outputting ffmpeg commands in some cases and being used to uncrt things)
-also would needs to support trimming I think..
-
 //#include "fmt/core.h"
 
 #include "rgmutil/util.h"

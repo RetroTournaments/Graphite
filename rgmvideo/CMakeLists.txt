@@ -59,5 +59,13 @@ if (UNIX)
     target_link_libraries(rgmvideolibextra
         v4l1 v4l2 avformat avcodec avutil swscale pthread fmt::fmt
     )
+
+    add_executable(uncrt
+        uncrt_main.cpp
+    )
+    target_link_libraries(uncrt
+        rgmutillib
+        rgmvideolib
+    )
 endif()
 
