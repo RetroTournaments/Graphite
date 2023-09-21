@@ -134,6 +134,6 @@ jobs:
         uses: ncipollo/release-action@v1
         with:
           commit: master
-          tag: ${{ github.run_number }}
+          tag: ${{ inputs.name }}
           name: ${{ inputs.name }}
           artifacts: "graphite-linux-x86_64/graphite-x86_64.AppImage,graphite-windows-x86_64/graphite-windows-x86_64.zip"
