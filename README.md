@@ -5,7 +5,7 @@ presses that can be played back in an emulator.
 
 ## Download
 
-[downloads](https://www.flibidydibidy.com/graphite)
+[downloads](https://github.com/RetroTournaments/Graphite/releases/)
 
 ## Contributing
 
