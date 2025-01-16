@@ -103,3 +103,7 @@ set(nlohmann_json_INCLUDE_DIRS
     PARENT_SCOPE
 )
 
+#################################################################################
+# Native File Dialog Extended
+#################################################################################
+add_subdirectory(nativefiledialog-extended)
