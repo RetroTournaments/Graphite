@@ -48,7 +48,7 @@ add_library(3rdimgui STATIC
     "imgui/imgui_demo.cpp"
     "imgui/imgui_widgets.cpp"
     "imgui/imgui_tables.cpp"
-    "imgui/backends/imgui_impl_sdl.cpp"
+    "imgui/backends/imgui_impl_sdl2.cpp"
     "imgui/backends/imgui_impl_opengl3.cpp"
 )
 if (UNIX)
@@ -103,3 +103,7 @@ set(nlohmann_json_INCLUDE_DIRS
     PARENT_SCOPE
 )
 
+#################################################################################
+# Native File Dialog Extended
+#################################################################################
+add_subdirectory(nativefiledialog-extended)

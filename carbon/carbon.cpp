@@ -95,7 +95,7 @@ static cv::Mat CropWithZeroPadding(cv::Mat img, cv::Rect cropRect) {
     return m;
 }
 
-cv::Mat carbon::ApplyFilter(const cv::Mat img, const FilterConfig& filter, 
+cv::Mat carbon::ApplyFilter(const cv::Mat img, const FilterConfig& filter,
         const rgms::video::PixelContributions& contributions) {
     cv::Rect cropRect(
         static_cast<int>(std::round(filter.Crop.X)),
@@ -107,7 +107,7 @@ cv::Mat carbon::ApplyFilter(const cv::Mat img, const FilterConfig& filter,
     if (filter.Type == FilterType::CROP) {
 
         cv::Mat ret = CropWithZeroPadding(img, cropRect); if (!(ret.rows == 0 || ret.cols == 0)) {
-            cv::resize(ret, ret, {filter.OutWidth, filter.OutHeight}, 
+            cv::resize(ret, ret, {filter.OutWidth, filter.OutHeight},
                     0, 0, cv::INTER_AREA);
         }
         return ret;
@@ -264,7 +264,7 @@ void CarbonApp::ReadFrame() {
             cv::resize(m_OutImage, m_OutImage, {}, m_OutMult, m_OutMult, cv::INTER_NEAREST);
         }
 
-        m_Image = CropWithZeroPadding(m_Image, 
+        m_Image = CropWithZeroPadding(m_Image,
                 cv::Rect(-50, -50, m_Image.cols + 100, m_Image.rows + 100));
         if (m_FrameMult > 0 && m_FrameMult != 1.0) {
             cv::resize(m_Image, m_Image, {}, m_FrameMult, m_FrameMult);
@@ -275,23 +275,23 @@ void CarbonApp::ReadFrame() {
 void CarbonApp::SelectHandleHotkeys() {
     FilterType ft = m_Config->FilterCfg.Type;
     if (ft == FilterType::CROP || ft == FilterType::PERSPECTIVE) {
-        if (ImGui::IsKeyPressed(SDL_SCANCODE_KP_1)) {
+        if (ImGui::IsKeyPressed(ImGuiKey_Keypad1)) {
             m_SelectedHandle = 3;
-        } else if (ImGui::IsKeyPressed(SDL_SCANCODE_KP_2)) {
+        } else if (ImGui::IsKeyPressed(ImGuiKey_Keypad2)) {
             m_SelectedHandle = 5;
-        } else if (ImGui::IsKeyPressed(SDL_SCANCODE_KP_3)) {
+        } else if (ImGui::IsKeyPressed(ImGuiKey_Keypad3)) {
             m_SelectedHandle = 2;
-        } else if (ImGui::IsKeyPressed(SDL_SCANCODE_KP_4)) {
+        } else if (ImGui::IsKeyPressed(ImGuiKey_Keypad4)) {
             m_SelectedHandle = 6;
-        } else if (ImGui::IsKeyPressed(SDL_SCANCODE_KP_5)) {
+        } else if (ImGui::IsKeyPressed(ImGuiKey_Keypad5)) {
             m_SelectedHandle = 8;
-        } else if (ImGui::IsKeyPressed(SDL_SCANCODE_KP_6)) {
+        } else if (ImGui::IsKeyPressed(ImGuiKey_Keypad6)) {
             m_SelectedHandle = 7;
-        } else if (ImGui::IsKeyPressed(SDL_SCANCODE_KP_7)) {
+        } else if (ImGui::IsKeyPressed(ImGuiKey_Keypad7)) {
             m_SelectedHandle = 0;
-        } else if (ImGui::IsKeyPressed(SDL_SCANCODE_KP_8)) {
+        } else if (ImGui::IsKeyPressed(ImGuiKey_Keypad8)) {
             m_SelectedHandle = 4;
-        } else if (ImGui::IsKeyPressed(SDL_SCANCODE_KP_9)) {
+        } else if (ImGui::IsKeyPressed(ImGuiKey_Keypad9)) {
             m_SelectedHandle = 1;
         }
     }
@@ -300,9 +300,9 @@ void CarbonApp::SelectHandleHotkeys() {
 void CarbonApp::UpdatePixelContributions() {
     if (m_LiveInputFrame) {
         rgms::video::ComputePixelContributions(
-            m_LiveInputFrame->Height, m_LiveInputFrame->Width, 
+            m_LiveInputFrame->Height, m_LiveInputFrame->Width,
             m_Config->FilterCfg.Patch,
-            &m_PixelContributions, 
+            &m_PixelContributions,
             m_Config->FilterCfg.OutWidth,
             m_Config->FilterCfg.OutHeight);
     }
@@ -394,10 +394,10 @@ bool CarbonApp::OnFrame() {
         ImGui::PopItemWidth();
 
         if (m_LiveInputFrame) {
-            ImGui::TextUnformatted(fmt::format("{}x{} {:7d} {}", 
+            ImGui::TextUnformatted(fmt::format("{}x{} {:7d} {}",
                         m_LiveInputFrame->Width, m_LiveInputFrame->Height, m_LiveInputFrame->FrameNumber,
                         util::SimpleMillisFormat(m_LiveInputFrame->PtsMilliseconds, util::SimpleTimeFormatFlags::MSCS)).c_str());
-            rgmui::MatAnnotator mat("frame", m_Image, m_FrameMult, 
+            rgmui::MatAnnotator mat("frame", m_Image, m_FrameMult,
                     util::Vector2F(-50 * m_FrameMult, -50 * m_FrameMult), false);
 
             DrawFilterAnnotations(&mat, m_Config->FilterCfg);
@@ -441,7 +441,7 @@ bool CarbonApp::OnFrame() {
                 }
             }
 
-            if (m_SelectedHandle >= 0 && 
+            if (m_SelectedHandle >= 0 &&
                 ImGui::IsMouseDown(ImGuiMouseButton_Left) &&
                 ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
 
@@ -461,7 +461,7 @@ bool CarbonApp::OnFrame() {
 
     if (ImGui::Begin("out frame")) {
         if (m_LiveInputFrame) {
-            rgmui::MatAnnotator mat("out", m_OutImage, m_OutMult); 
+            rgmui::MatAnnotator mat("out", m_OutImage, m_OutMult);
             // TODO account for xdiv etc
             for (int x = 0; x < 256; x += 8) {
                 float w = 1.0f;
@@ -573,14 +573,14 @@ void CarbonApp::AddCropHandles(cv::Mat m) {
     ImU32 c = IM_COL32(255, 0, 0, 255);
 
     m_Handles.push_back(std::make_shared<CropHandle>(
-        filter.Crop.X, filter.Crop.Y, 
-        [&](float sx, float sy){ 
+        filter.Crop.X, filter.Crop.Y,
+        [&](float sx, float sy){
             filter.Crop.Width -= (sx - filter.Crop.X);
             filter.Crop.Height -= (sy - filter.Crop.Y);
             filter.Crop.X = sx;
             filter.Crop.Y = sy;
         },
-        [&](float dx, float dy){ 
+        [&](float dx, float dy){
             filter.Crop.X += dx;
             filter.Crop.Width -= dx;
             filter.Crop.Y += dy;
@@ -588,81 +588,81 @@ void CarbonApp::AddCropHandles(cv::Mat m) {
         }, c, HandleSize(1, 1), m));
     m_Handles.push_back(std::make_shared<CropHandle>(
                 (filter.Crop.X + filter.Crop.Width), (filter.Crop.Y),
-            [&](float sx, float sy){ 
+            [&](float sx, float sy){
                 filter.Crop.Width = sx - filter.Crop.X;
                 filter.Crop.Height -= (sy - filter.Crop.Y);
                 filter.Crop.Y = sy;
             },
-            [&](float dx, float dy){ 
+            [&](float dx, float dy){
                 filter.Crop.Width += dx;
                 filter.Crop.Y += dy;
                 filter.Crop.Height -= dy;
             }, c, HandleSize( 1, 1), m));
     m_Handles.push_back(std::make_shared<CropHandle>(
                 (filter.Crop.X + filter.Crop.Width), (filter.Crop.Y + filter.Crop.Height),
-            [&](float sx, float sy){ 
+            [&](float sx, float sy){
                 filter.Crop.Width = sx - filter.Crop.X;
                 filter.Crop.Height = sy - filter.Crop.Y;
             },
-            [&](float dx, float dy){ 
+            [&](float dx, float dy){
                 filter.Crop.Width += dx;
                 filter.Crop.Height += dy;
             }, c, HandleSize( 1, 1), m));
     m_Handles.push_back(std::make_shared<CropHandle>(
                 (filter.Crop.X), (filter.Crop.Y + filter.Crop.Height),
-            [&](float sx, float sy){ 
+            [&](float sx, float sy){
                 filter.Crop.Height = (sy - filter.Crop.Y);
                 filter.Crop.Width -= (sx - filter.Crop.X);
                 filter.Crop.X = sx;
             },
-            [&](float dx, float dy){ 
+            [&](float dx, float dy){
                 filter.Crop.Height += dy;
                 filter.Crop.X += dx;
                 filter.Crop.Width -= dx;
             }, c, HandleSize( 1, 1), m));
     m_Handles.push_back(std::make_shared<CropHandle>(
                 (filter.Crop.X + filter.Crop.Width / 2), (filter.Crop.Y),
-            [&](float sx, float sy){ 
+            [&](float sx, float sy){
                 filter.Crop.Height -= (sy - filter.Crop.Y);
                 filter.Crop.Y = sy;
             },
-            [&](float dx, float dy){ 
+            [&](float dx, float dy){
                 filter.Crop.Height -= dy;
                 filter.Crop.Y += dy;
             }, c, HandleSize( 2, 1), m));
     m_Handles.push_back(std::make_shared<CropHandle>(
                 (filter.Crop.X + filter.Crop.Width / 2), (filter.Crop.Y + filter.Crop.Height),
-            [&](float sx, float sy){ 
+            [&](float sx, float sy){
                 filter.Crop.Height = sy - filter.Crop.Y;
             },
-            [&](float dx, float dy){ 
+            [&](float dx, float dy){
                 filter.Crop.Height += dy;
             }, c, HandleSize( 2, 1), m));
     m_Handles.push_back(std::make_shared<CropHandle>(
                 (filter.Crop.X), (filter.Crop.Y + filter.Crop.Height/ 2),
-            [&](float sx, float sy){ 
+            [&](float sx, float sy){
                 filter.Crop.Width -= (sx - filter.Crop.X);
                 filter.Crop.X = sx;
             },
-            [&](float dx, float dy){ 
+            [&](float dx, float dy){
                 filter.Crop.X += dx;
                 filter.Crop.Width -= dx;
             }, c, HandleSize( 1, 2), m));
     m_Handles.push_back(std::make_shared<CropHandle>(
                 (filter.Crop.X + filter.Crop.Width), (filter.Crop.Y + filter.Crop.Height/ 2),
-            [&](float sx, float sy){ 
+            [&](float sx, float sy){
                 filter.Crop.Width = sx - filter.Crop.X;
             },
-            [&](float dx, float dy){ 
+            [&](float dx, float dy){
                 filter.Crop.Width += dx;
             }, c, HandleSize( 1, 2), m));
     m_Handles.push_back(std::make_shared<CropHandle>(
                 (filter.Crop.X + filter.Crop.Width / 2), (filter.Crop.Y + filter.Crop.Height/ 2),
-            [&](float sx, float sy){ 
+            [&](float sx, float sy){
                 filter.Crop.X = (sx - filter.Crop.Width / 2);
                 filter.Crop.Y = (sy - filter.Crop.Height / 2);
             },
-            [&](float dx, float dy){ 
+            [&](float dx, float dy){
                 filter.Crop.X += dx;
                 filter.Crop.Y += dy;
             }, c, HandleSize( 2, 2), m));
@@ -693,7 +693,7 @@ void CarbonApp::SetupHandles() {
                     &filter.Quad[i],
                     &filter.Quad[j]
                 };
-                m_Handles.push_back(std::make_shared<PointsHandle>(pts, c, 
+                m_Handles.push_back(std::make_shared<PointsHandle>(pts, c,
                             HandleSize(1 + ox, 1 + oy)));
                 apts.push_back(&filter.Quad[i]);
             }

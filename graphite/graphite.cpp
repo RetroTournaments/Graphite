@@ -30,6 +30,8 @@ namespace fs = std::experimental::filesystem;
 #include "fmt/core.h"
 #include "imgui_internal.h"
 #include "spdlog/spdlog.h"
+#include "nfd.h"
+#include "nfd_sdl2.h"
 
 #include "graphite/graphite.h"
 #include "rgmnes/nestopiaimpl.h"
@@ -111,21 +113,21 @@ bool graphite::ParseArgumentsToConfig(int* argc, char*** argv, const char* confi
 static int KeyPressedFrameAdvance() {
     int dx = 0;
 
-    if (ImGui::IsKeyPressed(SDL_SCANCODE_LEFT)) {
+    if (ImGui::IsKeyPressed(ImGuiKey_LeftArrow)) {
         dx = -1;
-    } else if (ImGui::IsKeyPressed(SDL_SCANCODE_RIGHT)) {
+    } else if (ImGui::IsKeyPressed(ImGuiKey_RightArrow)) {
         dx =  1;
-    } else if (ImGui::IsKeyPressed(SDL_SCANCODE_BACKSPACE)) {
+    } else if (ImGui::IsKeyPressed(ImGuiKey_Backspace)) {
         dx = -1;
-    } else if (ImGui::IsKeyPressed(SDL_SCANCODE_BACKSLASH)) {
+    } else if (ImGui::IsKeyPressed(ImGuiKey_Backslash)) {
         dx =  1;
-    } else if (ImGui::IsKeyPressed(SDL_SCANCODE_UP)) {
+    } else if (ImGui::IsKeyPressed(ImGuiKey_UpArrow)) {
         dx = -8;
-    } else if (ImGui::IsKeyPressed(SDL_SCANCODE_DOWN)) {
+    } else if (ImGui::IsKeyPressed(ImGuiKey_DownArrow)) {
         dx =  8;
-    } else if (ImGui::IsKeyPressed(SDL_SCANCODE_PAGEUP)) {
+    } else if (ImGui::IsKeyPressed(ImGuiKey_PageUp)) {
         dx = -64;
-    } else if (ImGui::IsKeyPressed(SDL_SCANCODE_PAGEDOWN)) {
+    } else if (ImGui::IsKeyPressed(ImGuiKey_PageDown)) {
         dx =  64;
     }
 
@@ -136,7 +138,7 @@ static int KeyPressedFrameAdvance() {
 }
 
 
-GraphiteApp::GraphiteApp(GraphiteConfig* config) 
+GraphiteApp::GraphiteApp(GraphiteConfig* config)
     : m_Config(config)
 {
     auto overlay = std::make_shared<OverlayComponent>(
@@ -230,10 +232,10 @@ bool GraphiteApp::DoMainMenuBar() {
     return ret;
 }
 
-NESEmulatorComponent::NESEmulatorComponent(rgmui::EventQueue* queue, 
+NESEmulatorComponent::NESEmulatorComponent(rgmui::EventQueue* queue,
         const std::string& inesPath,
         EmuViewConfig* emuViewConfig,
-        std::shared_ptr<OverlayComponent> overlay) 
+        std::shared_ptr<OverlayComponent> overlay)
     : m_EventQueue(queue)
     , m_EmulatorFactory(InitializeEmulatorFactory(inesPath))
     , m_StateSequenceThread(
@@ -288,7 +290,7 @@ void NESEmulatorComponent::OnFrame() {
 ////////////////////////////////////////////////////////////////////////////////
 
 //   ColumnPadding
-// |  |      |                                
+// |  |      |
 //  >> 000001 aaaabbbbssssttttuuuuddddllllrrrr
 //  ||      |    |   |   |   |   |   |   |   |
 //  ||      |    |___|___|___|___|___|___|___|_ the button states
@@ -305,7 +307,7 @@ enum TASEditorInputsColumnIndices : int {
 HotkeyConfig::HotkeyConfig() {
 }
 
-HotkeyConfig::HotkeyConfig(SDL_Scancode sc, SDL_Keymod km, bool rpt, InputAction act)
+HotkeyConfig::HotkeyConfig(ImGuiKey sc, SDL_Keymod km, bool rpt, InputAction act)
     : Scancode(sc)
     , Keymod(km)
     , Repeat(rpt)
@@ -334,7 +336,7 @@ static bool HotkeyKeymodSatisfied(SDL_Keymod hkm) {
     return true;
 }
 
-static std::string HotkeyStringFromModCode(SDL_Scancode sc, SDL_Keymod km) {
+static std::string HotkeyStringFromModCode(ImGuiKey sc, SDL_Keymod km) {
     std::ostringstream os;
 
     // Don't really handle all cases but I mean that's fine for what we're dealing with
@@ -351,9 +353,7 @@ static std::string HotkeyStringFromModCode(SDL_Scancode sc, SDL_Keymod km) {
         os << "shift-";
     }
 
-    SDL_Keycode kc = SDL_GetKeyFromScancode(sc);
-    os << SDL_GetKeyName(kc);
-
+    os << ImGui::GetKeyName(sc);
     return os.str();
 };
 
@@ -383,24 +383,24 @@ InputsConfig InputsConfig::Defaults() {
     cfg.VisibleButtons = 0b11111111;
 
     cfg.Hotkeys = {
-        {SDL_SCANCODE_1,  KMOD_NONE,  true, InputAction::SMB_JUMP_EARLIER},
-        {SDL_SCANCODE_2,  KMOD_NONE,  true, InputAction::SMB_JUMP_LATER},
-        {SDL_SCANCODE_2, KMOD_SHIFT, false, InputAction::SMB_REMOVE_LAST_JUMP},
-        {SDL_SCANCODE_3,  KMOD_NONE,  true, InputAction::SMB_JUMP},
-        {SDL_SCANCODE_3, KMOD_SHIFT, false, InputAction::SMB_FULL_JUMP},
-        {SDL_SCANCODE_4,  KMOD_NONE,  true, InputAction::SMB_JUMP_SHORTER},
-        {SDL_SCANCODE_4, KMOD_SHIFT, false, InputAction::SMB_REMOVE_LAST_JUMP},
-        {SDL_SCANCODE_5,  KMOD_NONE,  true, InputAction::SMB_JUMP_LONGER},
+        {ImGuiKey_1,  KMOD_NONE,  true, InputAction::SMB_JUMP_EARLIER},
+        {ImGuiKey_2,  KMOD_NONE,  true, InputAction::SMB_JUMP_LATER},
+        {ImGuiKey_2, KMOD_SHIFT, false, InputAction::SMB_REMOVE_LAST_JUMP},
+        {ImGuiKey_3,  KMOD_NONE,  true, InputAction::SMB_JUMP},
+        {ImGuiKey_3, KMOD_SHIFT, false, InputAction::SMB_FULL_JUMP},
+        {ImGuiKey_4,  KMOD_NONE,  true, InputAction::SMB_JUMP_SHORTER},
+        {ImGuiKey_4, KMOD_SHIFT, false, InputAction::SMB_REMOVE_LAST_JUMP},
+        {ImGuiKey_5,  KMOD_NONE,  true, InputAction::SMB_JUMP_LONGER},
 
-        {SDL_SCANCODE_T,  KMOD_NONE, false, InputAction::SMB_START},
+        {ImGuiKey_T,  KMOD_NONE, false, InputAction::SMB_START},
 
-        {SDL_SCANCODE_I,  KMOD_NONE,  true, InputAction::INSERT_FRAME},
-        {SDL_SCANCODE_I, KMOD_SHIFT, false, InputAction::SMB_INSERT_FRAMERULE},
-        {SDL_SCANCODE_D,  KMOD_NONE,  true, InputAction::DELETE_FRAME},
-        {SDL_SCANCODE_D, KMOD_SHIFT, false, InputAction::SMB_DELETE_FRAMERULE},
+        {ImGuiKey_I,  KMOD_NONE,  true, InputAction::INSERT_FRAME},
+        {ImGuiKey_I, KMOD_SHIFT, false, InputAction::SMB_INSERT_FRAMERULE},
+        {ImGuiKey_D,  KMOD_NONE,  true, InputAction::DELETE_FRAME},
+        {ImGuiKey_D, KMOD_SHIFT, false, InputAction::SMB_DELETE_FRAMERULE},
 
-        {SDL_SCANCODE_M,  KMOD_NONE, false, InputAction::SET_REMOVE_MARKER},
-        {SDL_SCANCODE_N,  KMOD_NONE, false, InputAction::GOTO_MARKER},
+        {ImGuiKey_M,  KMOD_NONE, false, InputAction::SET_REMOVE_MARKER},
+        {ImGuiKey_N,  KMOD_NONE, false, InputAction::GOTO_MARKER},
     };
 
 
@@ -475,7 +475,7 @@ void InputsComponent::HandleHotkeys() {
                 DoInputAction(hk.Action);
             }
         }
-    } 
+    }
 
     if (m_DragInputChanger.IsDragging()) {
         int dx = KeyPressedFrameAdvance();
@@ -495,7 +495,7 @@ void InputsComponent::TryReadFM2() {
         int frameIndex = 0;
         for (auto & input : m_Inputs) {
             if (input) {
-                m_EventQueue->Publish(EventType::INPUT_SET_TO, 
+                m_EventQueue->Publish(EventType::INPUT_SET_TO,
                         std::make_shared<InputChangeEvent>(frameIndex, input));
             }
             frameIndex++;
@@ -651,8 +651,8 @@ void InputsComponent::DoInputLine(int frameIndex) {
 
     // Clicks in chevron column
     if (m_AllowDragging &&
-        (targetDraggingAndGood || ImGui::IsMouseHoveringRect(gul, glr)) && 
-        !m_DragInputChanger.IsDragging() && 
+        (targetDraggingAndGood || ImGui::IsMouseHoveringRect(gul, glr)) &&
+        !m_DragInputChanger.IsDragging() &&
         ImGui::IsMouseDown(ImGuiMouseButton_Left)) {
 
         m_TargetScroller.SuspendAutoScroll();
@@ -753,7 +753,7 @@ void InputsComponent::DoInputLine(int frameIndex) {
             }
 
             if (ImGui::IsMouseReleased(ImGuiMouseButton_Left)) {
-                if (m_DragInputChanger.IsDragging() && 
+                if (m_DragInputChanger.IsDragging() &&
                     !m_DragInputChanger.HasDragged() &&
                     button == m_DragInputChanger.Button()) {
                     if (buttonOn) {
@@ -782,7 +782,7 @@ void InputsComponent::DoInputLine(int frameIndex) {
     }
 
     ImVec2 dragDelta = ImGui::GetMouseDragDelta(ImGuiMouseButton_Right);
-    if (ImGui::IsMouseReleased(ImGuiMouseButton_Right) && 
+    if (ImGui::IsMouseReleased(ImGuiMouseButton_Right) &&
         dragDelta.x == 0.0f &&
         dragDelta.y == 0.0f) {
         ImGui::OpenPopupOnItemClick("frame_popup");
@@ -865,7 +865,7 @@ void InputsComponent::DoInputAction(InputAction action) {
             if (from != to && from > 0) {
                 m_UndoRedo.ChangeInputTo(from - 1, m_Inputs[from - 1] | nes::Button::A);
             }
-            break; 
+            break;
         }
         case InputAction::SMB_JUMP_LATER: {
             auto [from, to] = FindPreviousJump();
@@ -912,7 +912,7 @@ void InputsComponent::DoInputAction(InputAction action) {
                 if (m_Inputs[s] & nes::Button::A) {
                     auto [from, to] = FindPreviousJump();
                     s = from;
-                } 
+                }
 
                 int nchanges = 0;
                 for (int i = 0; i < 35; i++) {
@@ -1166,7 +1166,7 @@ void InputsComponent::TargetScroller::UpdateScroll() {
     m_ScrolledNext = false;
     m_CurrentMaxY = ImGui::GetScrollMaxY();
     m_VisibleY = ImGui::GetContentRegionAvail().y;
-    
+
     if (m_AutoScroll && (m_InputsComponent->m_TargetIndex != m_LastScrollTarget)) {
         SetScrollDirectTo(m_InputsComponent->m_TargetIndex);
     }
@@ -1219,7 +1219,7 @@ void InputsComponent::DragInputChanger::Clear() {
     m_IsDragging = false;
     m_StartFrameIndex = -1;
     m_EndFrameIndex = -1;
-    m_Button = 0x00; 
+    m_Button = 0x00;
     m_HLButtons = 0x00;
     m_StartedOn = false;
 }
@@ -1321,7 +1321,7 @@ UndoRedo::~UndoRedo() {
 UndoRedo::Change::Change()  {
 }
 
-UndoRedo::Change::Change(int _frameIndex, nes::ControllerState _oldState, nes::ControllerState _newState) 
+UndoRedo::Change::Change(int _frameIndex, nes::ControllerState _oldState, nes::ControllerState _newState)
     : FrameIndex(_frameIndex)
     , OldState(_oldState)
     , NewState(_newState)
@@ -1346,7 +1346,7 @@ void UndoRedo::IntChangeInput(int frameIndex, nes::ControllerState newState) {
         m_Inputs->resize(frameIndex + 1, 0x00);
     }
     m_Inputs->at(frameIndex) = newState;
-    m_EventQueue->Publish(EventType::INPUT_SET_TO, 
+    m_EventQueue->Publish(EventType::INPUT_SET_TO,
             std::make_shared<InputChangeEvent>(frameIndex, newState));
 
 }
@@ -1395,7 +1395,7 @@ void UndoRedo::ConsolidateLast(int count) {
         for (int i = (m_ChangeIndex - 1); i > (m_ChangeIndex - count); i--) {
             m_Changes[i].Consolidated = true;
         }
-    } 
+    }
 
 }
 
@@ -1472,7 +1472,7 @@ ScreenPeekConfig ScreenPeekConfig::Defaults() {
 
 static cv::Mat ConstructPaletteImage(
     const uint8_t* imgData,
-    int width, int height, 
+    int width, int height,
     const uint8_t* paletteData
 ) {
     cv::Mat m(height, width, CV_8UC3);
@@ -1575,7 +1575,7 @@ void ScreenPeekSubComponent::OnFrame() {
         //    ImGui::EndPopup();
         //} else {
         //    if (ImGui::IsWindowFocused()) {
-        //        if (GetScreenPeekPixel(cursorPos, ImGui::GetMousePos(), 
+        //        if (GetScreenPeekPixel(cursorPos, ImGui::GetMousePos(),
         //                    &x, &y, &pixel)) {
         //            DoHoverTooltip(x, y, pixel);
         //        }
@@ -1732,7 +1732,7 @@ void RAMWatchSubComponent::OnFrame() {
     }
     ImGui::End();
 }
-    
+
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -1935,10 +1935,10 @@ std::string VideoComponent::WindowName() {
 void VideoComponent::HandleHotkeys() {
     auto& io = ImGui::GetIO();
     if (!io.WantCaptureKeyboard) {
-        if (ImGui::IsKeyPressed(SDL_SCANCODE_COMMA, true) && rgmui::ShiftIsDown()) {
+        if (ImGui::IsKeyPressed(ImGuiKey_Comma, true) && rgmui::ShiftIsDown()) {
             UpdateOffset(-1);
         }
-        if (ImGui::IsKeyPressed(SDL_SCANCODE_PERIOD, true) && rgmui::ShiftIsDown()) {
+        if (ImGui::IsKeyPressed(ImGuiKey_Period, true) && rgmui::ShiftIsDown()) {
             UpdateOffset(1);
         }
     }
@@ -2039,7 +2039,7 @@ void PlaybackComponent::HandleHotkeys() {
             }
         }
 
-        if (ImGui::IsKeyPressed(SDL_SCANCODE_SPACE, false)) {
+        if (ImGui::IsKeyPressed(ImGuiKey_Space, false)) {
             TogglePlaying();
         }
     }
@@ -2115,32 +2115,17 @@ static bool IsValidVideoExtension(const std::string& extension) {
     return extension == ".mp4" || extension == ".mkv";
 }
 
-GraphiteConfigApp::GraphiteConfigApp(bool* wasExited, GraphiteConfig* config)
+GraphiteConfigApp::GraphiteConfigApp(bool* wasExited, SDL_Window* window, GraphiteConfig* config)
     : rgmui::IApplication(ThisApplicationConfig())
     , m_WasExited(wasExited)
+    , m_Window(window)
     , m_Config(config)
 {
-    for (const auto & entry : fs::directory_iterator(".")) {
-        if (IsValidINESExtension(entry.path().extension().string())) {
-            m_PossibleInesPaths.push_back(entry.path().string());
-        }
-    }
-    if (m_PossibleInesPaths.size() == 1) {
-        m_Config->InesPath = m_PossibleInesPaths.front();
-    }
-
-    for (const auto & entry : fs::directory_iterator(".")) {
-        if (IsValidVideoExtension(entry.path().extension().string())) {
-            m_PossibleVideoPaths.push_back(entry.path().string());
-        }
-    }
-    if (m_PossibleVideoPaths.size() == 1) {
-        m_Config->VideoPath = m_PossibleVideoPaths.front();
-        SetFM2PathFromVideoPath(m_Config);
-    }
+    NFD_Init();
 }
 
 GraphiteConfigApp::~GraphiteConfigApp() {
+    NFD_Quit();
 }
 
 rgmui::IApplicationConfig GraphiteConfigApp::ThisApplicationConfig() {
@@ -2159,6 +2144,33 @@ bool GraphiteConfigApp::OnSDLEvent(const SDL_Event& e) {
     return true;
 }
 
+static bool NFDPickFile(fs::path* path, SDL_Window* parent,
+        const char* name = nullptr, const char* extension = nullptr)
+{
+    nfdu8char_t* outPath;
+    nfdu8filteritem_t filters[1] = { { name, extension } };
+    nfdopendialogu8args_t args = {0};
+    if (name) {
+        args.filterList = filters;
+        args.filterCount = 1;
+    }
+    if (parent) {
+        NFD_GetNativeWindowFromSDLWindow(parent,
+                &args.parentWindow);
+    }
+    nfdresult_t result = NFD_OpenDialogU8_With(&outPath, &args);
+    if (result == NFD_OKAY) {
+        if (path) {
+            *path = fs::path(outPath);
+        }
+        NFD_FreePathU8(outPath);
+        return true;
+    } else if (result == NFD_ERROR) {
+        spdlog::error("{}", NFD_GetError());
+    }
+    return false;
+}
+
 bool GraphiteConfigApp::OnFrame() {
     bool ret = true;
     auto& io = ImGui::GetIO();
@@ -2166,21 +2178,13 @@ bool GraphiteConfigApp::OnFrame() {
     if (m_Config->InesPath.empty()) {
         ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f), ImGuiCond_Once,
                 ImVec2(0.5f, 0.5f));
-        ImGui::SetNextWindowSize(ImVec2(0, 0), ImGuiCond_Once);
+        ImGui::SetNextWindowSize(ImVec2(300, 0), ImGuiCond_Once);
 
-        if (ImGui::Begin("Select Ines File")) {
-            if (m_PossibleInesPaths.empty()) {
-                ImGui::TextUnformatted("Please place the .nes file in the");
-                ImGui::TextUnformatted("same directory as graphite.exe");
-                if (ImGui::Button("ok")) {
-                    *m_WasExited = true;
-                    ret = false;
-                }
-            } else {
-                for (auto & path : m_PossibleInesPaths) {
-                    if (ImGui::Button(path.c_str())) {
-                        m_Config->InesPath = path;
-                    }
+        if (ImGui::Begin("Select INES File (.nes)")) {
+            if (ImGui::Button("Select INES File (.nes)...", ImVec2(-1, 50))) {
+                fs::path p;
+                if (NFDPickFile(&p, m_Window, "INES Rom", "nes")) {
+                    m_Config->InesPath = p.string();
                 }
             }
         }
@@ -2188,22 +2192,13 @@ bool GraphiteConfigApp::OnFrame() {
     } else if (m_Config->VideoPath.empty()) {
         ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f), ImGuiCond_Once,
                 ImVec2(0.5f, 0.5f));
-        ImGui::SetNextWindowSize(ImVec2(0, 0), ImGuiCond_Once);
+        ImGui::SetNextWindowSize(ImVec2(300, 0), ImGuiCond_Once);
 
         if (ImGui::Begin("Select Video File")) {
-            if (m_PossibleVideoPaths.empty()) {
-                ImGui::TextUnformatted("Please place the .mp4 file in the");
-                ImGui::TextUnformatted("same directory as graphite.exe");
-                if (ImGui::Button("ok")) {
-                    *m_WasExited = true;
-                    ret = false;
-                }
-            } else {
-                for (auto & path : m_PossibleVideoPaths) {
-                    if (ImGui::Button(path.c_str())) {
-                        m_Config->VideoPath = path;
-                        SetFM2PathFromVideoPath(m_Config);
-                    }
+            if (ImGui::Button("Select Video File (.mp4)...", ImVec2(-1, 50))) {
+                fs::path p;
+                if (NFDPickFile(&p, m_Window, "MPEG-4", "mp4")) {
+                    m_Config->VideoPath = p.string();
                 }
             }
         }

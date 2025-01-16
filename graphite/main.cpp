@@ -71,7 +71,7 @@ int main(int argc, char** argv) {
         rgmui::Window window(config.WindowCfg.WindowWidth, config.WindowCfg.WindowHeight, windowTitle);
         spdlog::info("window created");
         ImGuiIO& io = ImGui::GetIO();
-        io.IniFilename = NULL; 
+        io.IniFilename = NULL;
 
         if (!config.ImguiIniSettings.empty()) {
             ImGui::LoadIniSettingsFromMemory(config.ImguiIniSettings.c_str());
@@ -80,7 +80,7 @@ int main(int argc, char** argv) {
         bool wasExited = false;
 
         if (useConfigApp) {
-            GraphiteConfigApp cfgApp(&wasExited, &config);
+            GraphiteConfigApp cfgApp(&wasExited, window.GetSDLWindow(), &config);
             rgmui::WindowAppMainLoop(&window, &cfgApp, std::chrono::microseconds(10000));
         }
 
