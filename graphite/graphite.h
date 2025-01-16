@@ -128,7 +128,7 @@ private:
 struct EmuViewConfig;
 class NESEmulatorComponent : public rgms::rgmui::IApplicationComponent {
 public:
-    NESEmulatorComponent(rgms::rgmui::EventQueue* queue, 
+    NESEmulatorComponent(rgms::rgmui::EventQueue* queue,
             const std::string& inesPath,
             EmuViewConfig* emuViewConfig,
             std::shared_ptr<OverlayComponent> overlay);
@@ -186,9 +186,9 @@ JSONEXT_SERIALIZE_ENUM_OPERATORS(InputAction);
 
 struct HotkeyConfig {
     HotkeyConfig();
-    HotkeyConfig(SDL_Scancode sc, SDL_Keymod km, bool rpt, InputAction act);
+    HotkeyConfig(ImGuiKey sc, SDL_Keymod km, bool rpt, InputAction act);
 
-    SDL_Scancode Scancode;
+    ImGuiKey Scancode;
     SDL_Keymod Keymod;
     bool Repeat;
     InputAction Action;
@@ -381,7 +381,7 @@ private:
 
     rgms::nes::FM2Header m_Header;
     std::string m_FM2Path;
-    int m_OffsetMillis; 
+    int m_OffsetMillis;
 
 
 private:
@@ -444,7 +444,7 @@ public:
 private:
     void SetBlankImage();
     void ConstructImageFromFrame();
-    
+
     std::string PositionText(int x, int y) const;
     std::string PixelText(uint8_t pixel) const;
     ImVec4 PeekPixelColor(uint8_t pixel) const;
@@ -490,7 +490,7 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(RAMWatchConfig,
 );
 
 class RAMWatchSubComponent : public IEmuPeekSubComponent {
-public: 
+public:
     RAMWatchSubComponent(rgms::rgmui::EventQueue* queue, RAMWatchConfig* config);
     virtual ~RAMWatchSubComponent();
 
@@ -669,7 +669,7 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(GraphiteConfig,
     OverlayCfg
 );
 
-bool ParseArgumentsToConfig(int* argc, char*** argv, const char* configfile, 
+bool ParseArgumentsToConfig(int* argc, char*** argv, const char* configfile,
         GraphiteConfig* config);
 void SetFM2PathFromVideoPath(GraphiteConfig* config);
 
