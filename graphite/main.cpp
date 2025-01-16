@@ -45,66 +45,85 @@ void UpdateDefaultsForScreenSize(GraphiteConfig* config) {
     }
 }
 
+static void do_graphite(int argc, char** argv) {
+    rgmui::InitializeDefaultLogger("graphite");
+    spdlog::info("program started");
+
+    if (SDL_Init(SDL_INIT_VIDEO) < 0) {
+        throw std::runtime_error(SDL_GetError());
+    }
+
+    GraphiteConfig config = GraphiteConfig::Defaults();
+    UpdateDefaultsForScreenSize(&config);
+
+    bool useConfigApp = false;
+    if (!ParseArgumentsToConfig(&argc, &argv, CONFIG_FILE, &config)) {
+        spdlog::warn("did not parse command line arguments");
+        useConfigApp = true;
+    }
+
+    std::string windowTitle = fmt::format("Graphite - {}", GraphiteVersionString());
+
+    rgmui::Window window(config.WindowCfg.WindowWidth, config.WindowCfg.WindowHeight, windowTitle);
+    spdlog::info("window created");
+    ImGuiIO& io = ImGui::GetIO();
+    io.IniFilename = NULL;
+
+    if (!config.ImguiIniSettings.empty()) {
+        ImGui::LoadIniSettingsFromMemory(config.ImguiIniSettings.c_str());
+    }
+
+    bool wasExited = false;
+    if (useConfigApp) {
+        GraphiteConfigApp cfgApp(&wasExited, window.GetSDLWindow(), &config);
+        rgmui::WindowAppMainLoop(&window, &cfgApp, std::chrono::microseconds(10000));
+    }
+    if (wasExited) {
+        return;
+    }
+
+    spdlog::info("config completed");
+    spdlog::info("ines path: {}", config.InesPath);
+    spdlog::info("video path: {}", config.VideoPath);
+    spdlog::info("fm2 path: {}", config.FM2Path);
+
+    bool useCropApp = false;
+    {
+        video::CVVideoCaptureSource video(config.VideoPath);
+        if (video.Width() != nes::FRAME_WIDTH || video.Height() != nes::FRAME_HEIGHT) {
+            spdlog::warn("Video has incorrect size. Launching resize");
+            useCropApp = true;
+        }
+    }
+    if (useCropApp) {
+        GraphiteCropApp cropApp(&wasExited, &config);
+        rgmui::WindowAppMainLoop(&window, &cropApp, std::chrono::microseconds(10000));
+    }
+    if (wasExited) {
+        return;
+    }
+
+    GraphiteApp app(&config);
+    spdlog::info("main loop initiated");
+    rgmui::WindowAppMainLoop(&window, &app, std::chrono::microseconds(16333));
+
+    if (config.SaveConfig) {
+        config.ImguiIniSettings = std::string(ImGui::SaveIniSettingsToMemory());
+        config.WindowCfg.WindowWidth = window.ScreenWidth();
+        config.WindowCfg.WindowHeight = window.ScreenHeight();
+
+        std::ofstream of("graphite.json");
+        of << std::setw(2) << nlohmann::json(config) << std::endl;
+        spdlog::info("config saved");
+    }
+}
+
 int main(int argc, char** argv) {
     util::ArgNext(&argc, &argv); // Skip path argument
 
     int ret = 0;
     try {
-        rgmui::InitializeDefaultLogger("graphite");
-        spdlog::info("program started");
-
-        if (SDL_Init(SDL_INIT_VIDEO) < 0) {
-            throw std::runtime_error(SDL_GetError());
-        }
-
-        GraphiteConfig config = GraphiteConfig::Defaults();
-        UpdateDefaultsForScreenSize(&config);
-
-        bool useConfigApp = false;
-        if (!ParseArgumentsToConfig(&argc, &argv, CONFIG_FILE, &config)) {
-            spdlog::warn("did not parse command line arguments");
-            useConfigApp = true;
-        }
-
-        std::string windowTitle = fmt::format("Graphite - {}", GraphiteVersionString());
-
-        rgmui::Window window(config.WindowCfg.WindowWidth, config.WindowCfg.WindowHeight, windowTitle);
-        spdlog::info("window created");
-        ImGuiIO& io = ImGui::GetIO();
-        io.IniFilename = NULL;
-
-        if (!config.ImguiIniSettings.empty()) {
-            ImGui::LoadIniSettingsFromMemory(config.ImguiIniSettings.c_str());
-        }
-
-        bool wasExited = false;
-
-        if (useConfigApp) {
-            GraphiteConfigApp cfgApp(&wasExited, window.GetSDLWindow(), &config);
-            rgmui::WindowAppMainLoop(&window, &cfgApp, std::chrono::microseconds(10000));
-        }
-
-        if (!wasExited) {
-            spdlog::info("config completed");
-            spdlog::info("ines path: {}", config.InesPath);
-            spdlog::info("video path: {}", config.VideoPath);
-            spdlog::info("fm2 path: {}", config.FM2Path);
-
-            GraphiteApp app(&config);
-            spdlog::info("main loop initiated");
-            rgmui::WindowAppMainLoop(&window, &app, std::chrono::microseconds(16333));
-
-            if (config.SaveConfig) {
-                config.ImguiIniSettings = std::string(ImGui::SaveIniSettingsToMemory());
-                config.WindowCfg.WindowWidth = window.ScreenWidth();
-                config.WindowCfg.WindowHeight = window.ScreenHeight();
-
-                std::ofstream of("graphite.json");
-                of << std::setw(2) << nlohmann::json(config) << std::endl;
-                spdlog::info("config saved");
-            }
-        }
-
+        do_graphite(argc, argv);
     } catch(const std::exception& e) {
         rgmui::LogAndDisplayException(e);
         ret = 1;
