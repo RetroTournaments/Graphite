@@ -30,6 +30,8 @@ namespace fs = std::experimental::filesystem;
 #include "fmt/core.h"
 #include "imgui_internal.h"
 #include "spdlog/spdlog.h"
+#include "nfd.h"
+#include "nfd_sdl2.h"
 
 #include "graphite/graphite.h"
 #include "rgmnes/nestopiaimpl.h"
@@ -2113,32 +2115,17 @@ static bool IsValidVideoExtension(const std::string& extension) {
     return extension == ".mp4" || extension == ".mkv";
 }
 
-GraphiteConfigApp::GraphiteConfigApp(bool* wasExited, GraphiteConfig* config)
+GraphiteConfigApp::GraphiteConfigApp(bool* wasExited, SDL_Window* window, GraphiteConfig* config)
     : rgmui::IApplication(ThisApplicationConfig())
     , m_WasExited(wasExited)
+    , m_Window(window)
     , m_Config(config)
 {
-    for (const auto & entry : fs::directory_iterator(".")) {
-        if (IsValidINESExtension(entry.path().extension().string())) {
-            m_PossibleInesPaths.push_back(entry.path().string());
-        }
-    }
-    if (m_PossibleInesPaths.size() == 1) {
-        m_Config->InesPath = m_PossibleInesPaths.front();
-    }
-
-    for (const auto & entry : fs::directory_iterator(".")) {
-        if (IsValidVideoExtension(entry.path().extension().string())) {
-            m_PossibleVideoPaths.push_back(entry.path().string());
-        }
-    }
-    if (m_PossibleVideoPaths.size() == 1) {
-        m_Config->VideoPath = m_PossibleVideoPaths.front();
-        SetFM2PathFromVideoPath(m_Config);
-    }
+    NFD_Init();
 }
 
 GraphiteConfigApp::~GraphiteConfigApp() {
+    NFD_Quit();
 }
 
 rgmui::IApplicationConfig GraphiteConfigApp::ThisApplicationConfig() {
@@ -2157,6 +2144,33 @@ bool GraphiteConfigApp::OnSDLEvent(const SDL_Event& e) {
     return true;
 }
 
+static bool NFDPickFile(fs::path* path, SDL_Window* parent,
+        const char* name = nullptr, const char* extension = nullptr)
+{
+    nfdu8char_t* outPath;
+    nfdu8filteritem_t filters[1] = { { name, extension } };
+    nfdopendialogu8args_t args = {0};
+    if (name) {
+        args.filterList = filters;
+        args.filterCount = 1;
+    }
+    if (parent) {
+        NFD_GetNativeWindowFromSDLWindow(parent,
+                &args.parentWindow);
+    }
+    nfdresult_t result = NFD_OpenDialogU8_With(&outPath, &args);
+    if (result == NFD_OKAY) {
+        if (path) {
+            *path = fs::path(outPath);
+        }
+        NFD_FreePathU8(outPath);
+        return true;
+    } else if (result == NFD_ERROR) {
+        spdlog::error("{}", NFD_GetError());
+    }
+    return false;
+}
+
 bool GraphiteConfigApp::OnFrame() {
     bool ret = true;
     auto& io = ImGui::GetIO();
@@ -2164,21 +2178,13 @@ bool GraphiteConfigApp::OnFrame() {
     if (m_Config->InesPath.empty()) {
         ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f), ImGuiCond_Once,
                 ImVec2(0.5f, 0.5f));
-        ImGui::SetNextWindowSize(ImVec2(0, 0), ImGuiCond_Once);
+        ImGui::SetNextWindowSize(ImVec2(300, 0), ImGuiCond_Once);
 
-        if (ImGui::Begin("Select Ines File")) {
-            if (m_PossibleInesPaths.empty()) {
-                ImGui::TextUnformatted("Please place the .nes file in the");
-                ImGui::TextUnformatted("same directory as graphite.exe");
-                if (ImGui::Button("ok")) {
-                    *m_WasExited = true;
-                    ret = false;
-                }
-            } else {
-                for (auto & path : m_PossibleInesPaths) {
-                    if (ImGui::Button(path.c_str())) {
-                        m_Config->InesPath = path;
-                    }
+        if (ImGui::Begin("Select INES File (.nes)")) {
+            if (ImGui::Button("Select INES File (.nes)...", ImVec2(-1, 50))) {
+                fs::path p;
+                if (NFDPickFile(&p, m_Window, "INES Rom", "nes")) {
+                    m_Config->InesPath = p.string();
                 }
             }
         }
@@ -2186,22 +2192,13 @@ bool GraphiteConfigApp::OnFrame() {
     } else if (m_Config->VideoPath.empty()) {
         ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f), ImGuiCond_Once,
                 ImVec2(0.5f, 0.5f));
-        ImGui::SetNextWindowSize(ImVec2(0, 0), ImGuiCond_Once);
+        ImGui::SetNextWindowSize(ImVec2(300, 0), ImGuiCond_Once);
 
         if (ImGui::Begin("Select Video File")) {
-            if (m_PossibleVideoPaths.empty()) {
-                ImGui::TextUnformatted("Please place the .mp4 file in the");
-                ImGui::TextUnformatted("same directory as graphite.exe");
-                if (ImGui::Button("ok")) {
-                    *m_WasExited = true;
-                    ret = false;
-                }
-            } else {
-                for (auto & path : m_PossibleVideoPaths) {
-                    if (ImGui::Button(path.c_str())) {
-                        m_Config->VideoPath = path;
-                        SetFM2PathFromVideoPath(m_Config);
-                    }
+            if (ImGui::Button("Select Video File (.mp4)...", ImVec2(-1, 50))) {
+                fs::path p;
+                if (NFDPickFile(&p, m_Window, "MPEG-4", "mp4")) {
+                    m_Config->VideoPath = p.string();
                 }
             }
         }

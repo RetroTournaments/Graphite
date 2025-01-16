@@ -30,7 +30,7 @@ add_library(graphitelib
     graphite.cpp
 )
 target_link_libraries(graphitelib
-    rgmneslib rgmuilib rgmvideolib spdlog::spdlog
+    rgmneslib rgmuilib rgmvideolib spdlog::spdlog nfd
 )
 target_include_directories(graphitelib PUBLIC
     ${nlohmann_json_INCLUDE_DIRS}

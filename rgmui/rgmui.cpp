@@ -102,6 +102,10 @@ bool Window::OnSDLEvent(const SDL_Event& e) {
     return true;
 }
 
+SDL_Window* Window::GetSDLWindow() {
+    return m_Window;
+}
+
 int Window::ScreenWidth() const {
     int w;
     SDL_GetWindowSize(m_Window, &w, NULL);

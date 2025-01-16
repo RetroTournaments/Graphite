@@ -41,7 +41,7 @@
 #include <functional>
 
 
-#include "SDL.h" 
+#include "SDL.h"
 #include "imgui.h"
 #include "opencv2/opencv.hpp"
 #include "fmt/core.h"
@@ -65,6 +65,8 @@ public:
 
     void NewFrame();
     void EndFrame();
+
+    SDL_Window* GetSDLWindow();
 
 private:
     SDL_Window* m_Window;
@@ -186,7 +188,7 @@ bool ArrowKeyHelper(const SDL_Event& e,
 bool ArrowKeyHelperInFrame(int* dx, int* dy, int shiftMultiplier);
 
 // Favorite is : ImGuiInputTextFlags_EnterReturnsTrue
-bool InputText(const char* label, std::string* str, 
+bool InputText(const char* label, std::string* str,
         ImGuiInputTextFlags flags = ImGuiInputTextFlags_None);
 bool InputColor(const char* label, ImU32* color);
 
@@ -197,7 +199,7 @@ void TextFmt(fmt::format_string<T...> fmt, T&&... args) {
 
 // When hovered these sliders adjust the values based on arrow keys / mouse
 // wheels
-bool SliderIntExt(const char* label, int* v, int min, int max, 
+bool SliderIntExt(const char* label, int* v, int min, int max,
         const char* format = "%d", ImGuiSliderFlags flags = 0,
         bool allowArrowKeys = true, bool allowMouseWheel = true,
         int singleMove = 1, int shiftMult = 8);
@@ -213,8 +215,8 @@ class MatAnnotator {
 public:
     // Construct (which will display the cv::Mat)
     //    The mat must be pre-scaled!
-    MatAnnotator(const char* label, const cv::Mat& img, 
-            float scale = 1.0f, rgms::util::Vector2F origin = {0.0f, 0.0f}, 
+    MatAnnotator(const char* label, const cv::Mat& img,
+            float scale = 1.0f, rgms::util::Vector2F origin = {0.0f, 0.0f},
             bool clipped = true);
     ~MatAnnotator();
 
@@ -225,7 +227,7 @@ public:
     util::Vector2F ScreenPosToMatPos2F(const ImVec2& p) const;
     util::Vector2I ScreenPosToMatPos2I(const ImVec2& p) const;
 
-    // Annotate the image 
+    // Annotate the image
     //  - these coordinates are in MAT space (so 0, 0 to mat.cols, mat.rows)
     void AddLine(const util::Vector2F& p1, const util::Vector2F& p2,
                  ImU32 col, float thickness = 1.0f);
@@ -286,7 +288,7 @@ bool IsAnyPopupOpen();
 
 // easier combo boxes
 template <typename T, typename Q>
-bool Combo2(const char* label, T* v, const Q& container, 
+bool Combo2(const char* label, T* v, const Q& container,
         std::function<std::string(const T&)> toStr) {
     bool changed = false;
 

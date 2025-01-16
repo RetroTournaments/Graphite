@@ -675,7 +675,7 @@ void SetFM2PathFromVideoPath(GraphiteConfig* config);
 
 class GraphiteConfigApp : public rgms::rgmui::IApplication {
 public:
-    GraphiteConfigApp(bool* wasExited, GraphiteConfig* config);
+    GraphiteConfigApp(bool* wasExited, SDL_Window* window, GraphiteConfig* config);
     ~GraphiteConfigApp();
 
     virtual bool OnSDLEvent(const SDL_Event& e) override;
@@ -684,10 +684,8 @@ public:
 private:
     static rgms::rgmui::IApplicationConfig ThisApplicationConfig();
     bool* m_WasExited;
+    SDL_Window* m_Window;
     GraphiteConfig* m_Config;
-
-    std::vector<std::string> m_PossibleInesPaths;
-    std::vector<std::string> m_PossibleVideoPaths;
 };
 
 ////////////////////////////////////////////////////////////////////////////////
