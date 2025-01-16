@@ -1740,6 +1740,10 @@ VideoConfig VideoConfig::Defaults() {
     VideoConfig cfg;
     cfg.ScreenMultiplier = 3;
     cfg.OffsetMillis = 0;
+    cfg.CropRect.X = 0;
+    cfg.CropRect.Y = 0;
+    cfg.CropRect.Width = 256;
+    cfg.CropRect.Height = 240;
     cfg.StaticVideoThreadCfg = rgms::video::StaticVideoThreadConfig::Defaults();
 
     return cfg;
@@ -1786,6 +1790,7 @@ VideoComponent::VideoComponent(rgmui::EventQueue* queue,
             m_WaitingFrame->Width,
             CV_8UC3,
             m_WaitingFrame->Buffer);
+    m.setTo(cv::Scalar::all(0));
     cv::putText(m, "Waiting for frame...", cv::Point(5, 100),
             cv::FONT_HERSHEY_DUPLEX, 0.5, CV_RGB(255, 0, 0), 1);
     cv::putText(m, "Or maybe it doesn't exist?", cv::Point(5, 150),
@@ -1862,6 +1867,38 @@ void VideoComponent::FindTargetFrame(int frameIndex) {
     SetVideoFrame(std::distance(m_PTS.begin(), it));
 }
 
+static cv::Mat CropWithZeroPadding(cv::Mat img, cv::Rect cropRect) {
+    if (img.empty()) {
+        return img;
+    }
+    if (cropRect.width < 0) {
+        cropRect.x += cropRect.width;
+        cropRect.width = -cropRect.width;
+    }
+    if (cropRect.height < 0) {
+        cropRect.y += cropRect.height;
+        cropRect.height = -cropRect.height;
+    }
+
+    cv::Rect imgRect = cv::Rect(0, 0, img.cols, img.rows);
+    cv::Rect overLapRect = imgRect & cropRect;
+    if (overLapRect.width == cropRect.width && overLapRect.height == cropRect.height) {
+        return img(overLapRect);
+    }
+
+    // add padding still
+    cv::Mat m = cv::Mat::zeros(cropRect.height, cropRect.width, img.type());
+    if (overLapRect.width > 0 && overLapRect.height > 0) {
+        img(overLapRect).copyTo(m(cv::Rect(overLapRect.x - cropRect.x, overLapRect.y - cropRect.y, overLapRect.width, overLapRect.height)));
+    }
+    return m;
+}
+static cv::Mat CropWithZeroPadding(cv::Mat img, const rgms::util::Rect2F& cropRect) {
+    cv::Rect r(cropRect.X, cropRect.Y, cropRect.Width, cropRect.Height);
+    return CropWithZeroPadding(img, r);
+}
+
+
 void VideoComponent::SetImageFromInputFrame(bool triggerNewFrame) {
     if (m_LiveInputFrame) {
         m_Image = cv::Mat(
@@ -1869,6 +1906,16 @@ void VideoComponent::SetImageFromInputFrame(bool triggerNewFrame) {
                 m_LiveInputFrame->Width,
                 CV_8UC3,
                 m_LiveInputFrame->Buffer);
+        if (m_LiveInputFrame->Height != nes::FRAME_HEIGHT || m_LiveInputFrame->Width != nes::FRAME_WIDTH) {
+            m_Image = CropWithZeroPadding(m_Image, m_Config->CropRect);
+            if (!(m_Image.rows == 0 || m_Image.cols == 0)) {
+                cv::resize(m_Image, m_Image,
+                        {nes::FRAME_WIDTH, nes::FRAME_HEIGHT},
+                        0, 0, cv::INTER_AREA);
+            } else {
+                throw std::runtime_error("invalid crop? or video? or?");
+            }
+        }
         if (triggerNewFrame) {
             m_Overlay->SetNewVideoFrame(m_Image);
         }
@@ -1886,12 +1933,6 @@ void VideoComponent::SetVideoFrame(int videoIndex) {
     m_LiveInputFrame = m_VideoThread->GetFrame(m_CurrentVideoIndex);
     if (!m_LiveInputFrame) {
         m_LiveInputFrame = m_WaitingFrame;
-    }
-
-    if (m_LiveInputFrame->Height != nes::FRAME_HEIGHT || m_LiveInputFrame->Width != nes::FRAME_WIDTH) {
-        throw std::runtime_error(fmt::format("Invalid video frame size '{}x{}'. Must be '{}x{}'",
-            m_LiveInputFrame->Width, m_LiveInputFrame->Height, nes::FRAME_WIDTH, nes::FRAME_HEIGHT));
-
     }
     SetImageFromInputFrame();
 }
@@ -2140,7 +2181,6 @@ bool GraphiteConfigApp::OnSDLEvent(const SDL_Event& e) {
         *m_WasExited = true;
         return false;
     }
-
     return true;
 }
 
@@ -2335,3 +2375,410 @@ void OverlayComponent::DoOverlay(cv::Mat from, float fromOn, float edgeOn, cv::M
     }
 }
 
+GraphiteCropApp::GraphiteCropApp(bool* wasExited, GraphiteConfig* config)
+    : rgmui::IApplication(ThisApplicationConfig())
+    , m_WasExited(wasExited)
+    , m_Config(config)
+    , m_VideoFrame(0)
+    , m_FrameMult(0.5)
+{
+    m_VideoThread = std::make_unique<video::StaticVideoThread>(
+                std::make_unique<video::CVVideoCaptureSource>(config->VideoPath),
+                config->VideoCfg.StaticVideoThreadCfg);
+}
+
+GraphiteCropApp::~GraphiteCropApp()
+{
+}
+
+rgmui::IApplicationConfig GraphiteCropApp::ThisApplicationConfig() {
+    rgmui::IApplicationConfig cfg = rgmui::IApplicationConfig::Defaults();
+    cfg.CtrlWIsExit = false;
+    cfg.DefaultDockspace = true;
+    return cfg;
+}
+
+void GraphiteCropApp::OnFirstFrame() {
+    ImGuiViewport* viewport = ImGui::GetMainViewport();
+    ImGuiID dockspaceId = rgmui::IApplication::GetDefaultDockspaceID();
+    ImGui::DockBuilderRemoveNode(dockspaceId);
+    ImGui::DockBuilderAddNode(dockspaceId, ImGuiDockNodeFlags_DockSpace);
+    ImGui::DockBuilderSetNodeSize(dockspaceId, viewport->Size);
+
+    ImGuiID inputNode = ImGui::DockBuilderSplitNode(dockspaceId, ImGuiDir_Left, 0.7f, nullptr, &dockspaceId);
+    ImGuiID cropNode = ImGui::DockBuilderSplitNode(dockspaceId, ImGuiDir_Down, 0.3f, nullptr, &dockspaceId);
+
+    ImGui::DockBuilderDockWindow("Input Frame", inputNode);
+    ImGui::DockBuilderDockWindow("Output Frame", dockspaceId);
+    ImGui::DockBuilderDockWindow("Crop", cropNode);
+
+    ImGui::DockBuilderFinish(dockspaceId);
+}
+
+bool GraphiteCropApp::OnSDLEvent(const SDL_Event& e) {
+    if (rgmui::KeyDownWithCtrl(e, SDLK_w)) {
+        *m_WasExited = true;
+        return false;
+    }
+    return true;
+}
+
+void GraphiteCropApp::DrawFilterAnnotations(rgms::rgmui::MatAnnotator* mat,
+        const rgms::util::Rect2F& crop)
+{
+    ImU32 col = IM_COL32(255, 0, 0, 255);
+
+    util::Vector2F a = crop.TopLeft();
+    util::Vector2F b = crop.BottomRight();
+    // TODO expose these magic numbers? 256 / 16 + 1 and 240 / 16 + 1
+    for (auto x : util::Linspace(a.x, b.x, 17)) {
+        mat->AddLine({x, a.y}, {x, b.y}, col);
+    }
+    for (auto y : util::Linspace(a.y, b.y, 16)) {
+        mat->AddLine({a.x, y}, {b.x, y}, col);
+    }
+}
+
+rgms::util::Vector2F GraphiteCropApp::HandleSize(int x, int y) {
+    float dx = (x == 1) ? 10.0f : 15.0f;
+    float dy = (y == 1) ? 10.0f : 15.0f;
+
+    dx /= m_FrameMult;
+    dy /= m_FrameMult;
+
+    return util::Vector2F(dx, dy);
+}
+
+void GraphiteCropApp::SetupHandles() {
+    m_Handles.clear();
+    ImU32 c = IM_COL32(255, 0, 0, 255);
+
+    rgms::util::Rect2F* rect = &m_Config->VideoCfg.CropRect;
+
+    m_Handles.push_back(std::make_shared<carbon::CropHandle>(
+        rect->X, rect->Y,
+        [&](float sx, float sy){
+            rect->Width -= (sx - rect->X);
+            rect->Height -= (sy - rect->Y);
+            rect->X = sx;
+            rect->Y = sy;
+        },
+        [&](float dx, float dy){
+            rect->X += dx;
+            rect->Width -= dx;
+            rect->Y += dy;
+            rect->Height -= dy;
+        }, c, HandleSize(1, 1)));
+    m_Handles.push_back(std::make_shared<carbon::CropHandle>(
+                (rect->X + rect->Width), (rect->Y),
+            [&](float sx, float sy){
+                rect->Width = sx - rect->X;
+                rect->Height -= (sy - rect->Y);
+                rect->Y = sy;
+            },
+            [&](float dx, float dy){
+                rect->Width += dx;
+                rect->Y += dy;
+                rect->Height -= dy;
+            }, c, HandleSize( 1, 1)));
+    m_Handles.push_back(std::make_shared<carbon::CropHandle>(
+                (rect->X + rect->Width), (rect->Y + rect->Height),
+            [&](float sx, float sy){
+                rect->Width = sx - rect->X;
+                rect->Height = sy - rect->Y;
+            },
+            [&](float dx, float dy){
+                rect->Width += dx;
+                rect->Height += dy;
+            }, c, HandleSize( 1, 1)));
+    m_Handles.push_back(std::make_shared<carbon::CropHandle>(
+                (rect->X), (rect->Y + rect->Height),
+            [&](float sx, float sy){
+                rect->Height = (sy - rect->Y);
+                rect->Width -= (sx - rect->X);
+                rect->X = sx;
+            },
+            [&](float dx, float dy){
+                rect->Height += dy;
+                rect->X += dx;
+                rect->Width -= dx;
+            }, c, HandleSize( 1, 1)));
+    m_Handles.push_back(std::make_shared<carbon::CropHandle>(
+                (rect->X + rect->Width / 2), (rect->Y),
+            [&](float sx, float sy){
+                rect->Height -= (sy - rect->Y);
+                rect->Y = sy;
+            },
+            [&](float dx, float dy){
+                rect->Height -= dy;
+                rect->Y += dy;
+            }, c, HandleSize( 2, 1)));
+    m_Handles.push_back(std::make_shared<carbon::CropHandle>(
+                (rect->X + rect->Width / 2), (rect->Y + rect->Height),
+            [&](float sx, float sy){
+                rect->Height = sy - rect->Y;
+            },
+            [&](float dx, float dy){
+                rect->Height += dy;
+            }, c, HandleSize( 2, 1)));
+    m_Handles.push_back(std::make_shared<carbon::CropHandle>(
+                (rect->X), (rect->Y + rect->Height/ 2),
+            [&](float sx, float sy){
+                rect->Width -= (sx - rect->X);
+                rect->X = sx;
+            },
+            [&](float dx, float dy){
+                rect->X += dx;
+                rect->Width -= dx;
+            }, c, HandleSize( 1, 2)));
+    m_Handles.push_back(std::make_shared<carbon::CropHandle>(
+                (rect->X + rect->Width), (rect->Y + rect->Height/ 2),
+            [&](float sx, float sy){
+                rect->Width = sx - rect->X;
+            },
+            [&](float dx, float dy){
+                rect->Width += dx;
+            }, c, HandleSize( 1, 2)));
+    m_Handles.push_back(std::make_shared<carbon::CropHandle>(
+                (rect->X + rect->Width / 2), (rect->Y + rect->Height/ 2),
+            [&](float sx, float sy){
+                rect->X = (sx - rect->Width / 2);
+                rect->Y = (sy - rect->Height / 2);
+            },
+            [&](float dx, float dy){
+                rect->X += dx;
+                rect->Y += dy;
+            }, c, HandleSize( 2, 2)));
+}
+
+void GraphiteCropApp::SelectHandleHotkeys() {
+    auto& io = ImGui::GetIO();
+    if (!io.WantCaptureKeyboard) {
+        if (ImGui::IsKeyPressed(ImGuiKey_Keypad1)) {
+            m_SelectedHandle = 3;
+        } else if (ImGui::IsKeyPressed(ImGuiKey_Keypad2)) {
+            m_SelectedHandle = 5;
+        } else if (ImGui::IsKeyPressed(ImGuiKey_Keypad3)) {
+            m_SelectedHandle = 2;
+        } else if (ImGui::IsKeyPressed(ImGuiKey_Keypad4)) {
+            m_SelectedHandle = 6;
+        } else if (ImGui::IsKeyPressed(ImGuiKey_Keypad5)) {
+            m_SelectedHandle = 8;
+        } else if (ImGui::IsKeyPressed(ImGuiKey_Keypad6)) {
+            m_SelectedHandle = 7;
+        } else if (ImGui::IsKeyPressed(ImGuiKey_Keypad7)) {
+            m_SelectedHandle = 0;
+        } else if (ImGui::IsKeyPressed(ImGuiKey_Keypad8)) {
+            m_SelectedHandle = 4;
+        } else if (ImGui::IsKeyPressed(ImGuiKey_Keypad9)) {
+            m_SelectedHandle = 1;
+        }
+    }
+}
+
+void GraphiteCropApp::DrawHandles(rgms::rgmui::MatAnnotator* mat) {
+    int index = 0;
+    for (auto & handle : m_Handles) {
+        util::Vector2F a = handle->HandleLocation();
+        util::Vector2F s = handle->HandleSize();
+        a -= s / 2;
+
+        ImU32 col = (index == m_SelectedHandle) ? IM_COL32_WHITE : handle->HandleColor();
+        mat->AddRectFilled(a, a + s, col);
+
+        index += 1;
+    }
+}
+
+void GraphiteCropApp::DoFFMPEGCommand() {
+    int cx = static_cast<int>(std::round(m_Config->VideoCfg.CropRect.X));
+    int cy = static_cast<int>(std::round(m_Config->VideoCfg.CropRect.Y));
+    int cw = static_cast<int>(std::round(m_Config->VideoCfg.CropRect.Width));
+    int ch = static_cast<int>(std::round(m_Config->VideoCfg.CropRect.Height));
+
+    int px = 0;
+    int py = 0;
+    std::string pw = "iw";
+    std::string ph = "ij";
+
+    if (cx < 0) {
+        pw = fmt::format("max(iw + {}\\, {})", -cx, cw);
+        px = -cx;
+        cx = 0;
+    } else {
+        pw = fmt::format("max(iw\\, {})", cx + cw);
+    }
+
+    if (cy < 0) {
+        ph = fmt::format("max(ih + {}\\, {})", -cy, ch);
+        py = -cy;
+        cy = 0;
+    } else {
+        ph = fmt::format("max(ih\\, {})", cy + ch);
+    }
+
+    std::string pad = fmt::format("pad={}:{}:{}:{}", pw, ph, px, py);
+    std::string crop = fmt::format("crop={}:{}:{}:{}", cw, ch, cx, cy);
+
+    std::string vf = fmt::format("{},{},scale=256:240:flags=area,setsar=1:1", pad, crop);
+
+    std::string cmd = fmt::format("ffmpeg -i \"{}\" -vf \"{}\" -vcodec libx264 -crf 12 out.mp4",
+            m_Config->VideoPath, vf);
+    ImGui::PushID(cmd.c_str());
+    ImGui::InputText("##copy", const_cast<char*>(cmd.c_str()), cmd.capacity() + 1,
+            ImGuiInputTextFlags_ReadOnly);
+    if (ImGui::BeginPopupContextItem("##copy", ImGuiPopupFlags_MouseButtonRight)) {
+        if (ImGui::Selectable("copy")) {
+            ImGui::SetClipboardText(cmd.c_str());
+        }
+        ImGui::EndPopup();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("copy")) {
+        ImGui::SetClipboardText(cmd.c_str());
+    }
+    ImGui::PopID();
+}
+
+bool GraphiteCropApp::OnFrame() {
+    bool ret = true;
+    bool changed = !m_LiveInputFrame;
+
+    auto& io = ImGui::GetIO();
+    if (ImGui::Begin("Input Frame")) {
+        ImGui::PushItemWidth(300);
+        if (rgmui::SliderIntExt("frame", &m_VideoFrame, 0, static_cast<int>(m_VideoThread->CurrentKnownNumFrames()) - 1)) {
+            changed = true;
+        }
+        if (rgmui::SliderFloatExt("mult", &m_FrameMult, 0.1f, 3.0f)) {
+            changed = true;
+        }
+        ImGui::PopItemWidth();
+
+        if (m_LiveInputFrame) {
+            rgmui::MatAnnotator mat("frame", m_Image, m_FrameMult,
+                    util::Vector2F(-50 * m_FrameMult, -50 * m_FrameMult), false);
+            DrawFilterAnnotations(&mat, m_Config->VideoCfg.CropRect);
+            SetupHandles();
+            SelectHandleHotkeys();
+
+            if (m_SelectedHandle != -1) {
+                int dx, dy;
+                if (rgms::rgmui::ArrowKeyHelperInFrame(&dx, &dy, 8)) {
+                    m_Handles[m_SelectedHandle]->Shift(util::Vector2F(
+                                static_cast<float>(dx),
+                                static_cast<float>(dy)));
+                    changed = true;
+                }
+            }
+
+            if (ImGui::IsMouseReleased(ImGuiMouseButton_Left) ||
+                ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+
+                m_SelectedHandle = -1;
+                ImVec2 sp = ImGui::GetMousePos();
+                for (int i = 0; i < static_cast<int>(m_Handles.size()); i++) {
+                    auto& handle = m_Handles[i];
+                    util::Vector2F a = handle->HandleLocation();
+                    util::Vector2F s = handle->HandleSize() + 5;
+                    a -= s / 2;
+
+                    ImVec2 hl = mat.MatPosToScreenPos(a);
+                    ImVec2 hb = mat.MatPosToScreenPos(a + s);
+
+                    if (sp.x >= hl.x && sp.y >= hl.y && sp.x <= hb.x && sp.y <= hb.y) {
+                        m_SelectedHandle = i;
+                        break;
+                    }
+                }
+            }
+
+            if (m_SelectedHandle >= 0 &&
+                ImGui::IsMouseDown(ImGuiMouseButton_Left) &&
+                ImGui::IsMouseDragging(ImGuiMouseButton_Left)) {
+
+                ImVec2 sp = ImGui::GetMousePos();
+                auto p = mat.ScreenPosToMatPos2F(sp);
+                m_Handles[m_SelectedHandle]->MoveTo(p);
+                changed = true;
+            }
+
+            DrawHandles(&mat);
+        }
+    }
+    ImGui::End();
+
+    if (ImGui::Begin("Output Frame")) {
+        if (m_LiveInputFrame) {
+            rgmui::MatAnnotator mat("out", m_OutImage, 2);
+            // TODO account for xdiv etc
+            for (int x = 0; x < 256; x += 8) {
+                float w = 1.0f;
+                if (x % 16 == 0) {
+                    w = 2.0f;
+                }
+                util::Vector2F a(static_cast<float>(x),   0.0f);
+                util::Vector2F b(static_cast<float>(x), 240.0f);
+                mat.AddLine(a, b, IM_COL32(255, 0, 0, 255), w);
+            }
+            for (int y = 0; y < 240; y += 8) {
+                float w = 1.0f;
+                if (y % 16 == 0) {
+                    w = 2.0f;
+                }
+                util::Vector2F a(  0.0f, static_cast<float>(y));
+                util::Vector2F b(256.0f, static_cast<float>(y));
+                mat.AddLine(a, b, IM_COL32(255, 0, 0, 255), w);
+            }
+        }
+    }
+    ImGui::End();
+
+    if (ImGui::Begin("Crop")) {
+        if (ImGui::Button("Reset")) {
+            m_Config->VideoCfg.CropRect.X = 0;
+            m_Config->VideoCfg.CropRect.Y = 0;
+            m_Config->VideoCfg.CropRect.Width = 256;
+            m_Config->VideoCfg.CropRect.Height = 240;
+        }
+        ImGui::PushItemWidth(120);
+        changed |= ImGui::InputFloat("x", &m_Config->VideoCfg.CropRect.X);
+        changed |= ImGui::InputFloat("y", &m_Config->VideoCfg.CropRect.Y);
+        changed |= ImGui::InputFloat("width", &m_Config->VideoCfg.CropRect.Width);
+        changed |= ImGui::InputFloat("height", &m_Config->VideoCfg.CropRect.Height);
+        ImGui::PopItemWidth();
+
+        DoFFMPEGCommand();
+
+
+        if (ImGui::Button("Set crop", ImVec2(250, 20))) {
+            ret = false;
+        }
+    }
+    ImGui::End();
+
+    if (changed) {
+        m_LiveInputFrame = m_VideoThread->GetFrame(m_VideoFrame);
+        if (m_LiveInputFrame) {
+            m_Image = cv::Mat(
+                    m_LiveInputFrame->Height,
+                    m_LiveInputFrame->Width,
+                    CV_8UC3,
+                    m_LiveInputFrame->Buffer);
+            m_OutImage = CropWithZeroPadding(m_Image, m_Config->VideoCfg.CropRect);
+            if (!(m_OutImage.rows == 0 || m_OutImage.cols == 0)) {
+                cv::resize(m_OutImage, m_OutImage,
+                        {nes::FRAME_WIDTH, nes::FRAME_HEIGHT},
+                        0, 0, cv::INTER_AREA);
+                cv::resize(m_OutImage, m_OutImage, {}, 2, 2, cv::INTER_NEAREST);
+            }
+            m_Image = CropWithZeroPadding(m_Image,
+                    cv::Rect(-50, -50, m_Image.cols + 100, m_Image.rows + 100));
+            if (m_FrameMult > 0 && m_FrameMult != 1.0) {
+                cv::resize(m_Image, m_Image, {}, m_FrameMult, m_FrameMult);
+            }
+        }
+    }
+
+    return ret;
+}

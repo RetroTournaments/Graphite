@@ -91,7 +91,7 @@ inline uint8_t Reverse(uint8_t b) {
 ////////////////////////////////////////////////////////////////////////////////
 //
 ////////////////////////////////////////////////////////////////////////////////
-template <typename T> 
+template <typename T>
 bool Clamp(T* v, T lo, T hi) {
     assert(v);
     bool r = false;
@@ -106,7 +106,7 @@ bool Clamp(T* v, T lo, T hi) {
     return r;
 }
 
-template <typename T> 
+template <typename T>
 T Clamped(T v, T lo, T hi) {
     Clamp(&v, lo, hi);
     return v;
@@ -117,7 +117,7 @@ T Clamped(T v, T lo, T hi) {
 //
 // std::vector<float> arr(100);
 // InplaceLinspace(arr.begin(), arr.end(), 0, 14);
-// 
+//
 // for (auto v : linspace(0, 1, 100) {
 // }
 ////////////////////////////////////////////////////////////////////////////////
@@ -152,7 +152,7 @@ void InplaceLinspace(Iter begin, Iter end, float start, float stop) {
 // without storing the entire thing in memory
 template <typename T>
 struct LinspaceIterator {
-    LinspaceIterator(T start, T step, int i) 
+    LinspaceIterator(T start, T step, int i)
         : m_start(start)
         , m_step(step)
         , m_i(i)
@@ -596,8 +596,8 @@ typedef VectorBase<int, 2> Vector2I;
 typedef std::array<Vector2F, 16> BezierPatch;
 BezierPatch RectanglePatch(Vector2F origin, Vector2F size);
 Vector2F EvaluateBezier(float t,
-                        const Vector2F& a, 
-                        const Vector2F& b, 
+                        const Vector2F& a,
+                        const Vector2F& b,
                         const Vector2F& c,
                         const Vector2F& d);
 
@@ -751,9 +751,9 @@ void ReservoirSampleVec(const RandomIt first, const RandomIt last, RandomIt outp
 template <typename T>
 class OnlineReservoirSampler {
 public:
-    OnlineReservoirSampler(size_t given_reservoir_size, int seed) 
+    OnlineReservoirSampler(size_t given_reservoir_size, int seed)
         : Reservoir(given_reservoir_size)
-        , m_ReservoirSize(given_reservoir_size) 
+        , m_ReservoirSize(given_reservoir_size)
         , m_Count(0)
         , m_GapCutoff(given_reservoir_size * 4)
         , m_Gap(0)
@@ -848,7 +848,7 @@ T Ease(const EasingType& etype, T x) {
     T pi = static_cast<T>(3.14159265358979);
     switch (etype) {
         case EasingType::LINEAR: {
-            return x; 
+            return x;
             break;
         }
         case EasingType::IN_SINE: {
@@ -856,7 +856,7 @@ T Ease(const EasingType& etype, T x) {
             break;
         }
         case EasingType::OUT_SINE: {
-            return std::sin((x * pi) / 2); 
+            return std::sin((x * pi) / 2);
             break;
         }
         case EasingType::INOUT_SINE: {

@@ -87,8 +87,8 @@ LiveVideoThread::LiveVideoThread(IVideoSourcePtr source, int queueSize, bool all
     , m_AllowDiscard(allowDiscard)
     , m_StartTime(util::mclock::now())
     , m_ResetTime(m_StartTime)
-    , m_InformationString(source->GetInformation()) 
-    , m_LiveInput(std::move(source)) 
+    , m_InformationString(source->GetInformation())
+    , m_LiveInput(std::move(source))
 {
     if (!m_LiveInput) {
         throw std::runtime_error("no source");
@@ -468,7 +468,7 @@ bool StaticVideoBuffer::MustRewind() const {
 }
 bool StaticVideoBuffer::MustAdvance() const {
     assert(BufferFull());
-    return (m_TargetFrameIndex - m_Records.front().FrameIndex) > 
+    return (m_TargetFrameIndex - m_Records.front().FrameIndex) >
             ((m_Records.back().FrameIndex - m_Records.front().FrameIndex) * m_Config.ForwardBias);
 }
 
@@ -518,7 +518,7 @@ void StaticVideoBuffer::DoWork(int64_t* frameIndex, int64_t* pts) {
     } else if (MustAdvance()) {
         newRec.Data = m_Records.front().Data;
         m_Records.pop_front();
-    } 
+    }
 
     if (!BufferFull() && newRec.Data) {
         if (m_Source->Get(newRec.Data, &newRec.PTS) == GetResult::SUCCESS) {
@@ -538,7 +538,7 @@ void StaticVideoBuffer::DoWork(int64_t* frameIndex, int64_t* pts) {
     }
 }
 
-bool StaticVideoBuffer::RecordIndex(int64_t frameIndex, 
+bool StaticVideoBuffer::RecordIndex(int64_t frameIndex,
         const std::deque<Record>& records, size_t* recordIndex) const {
     if (!records.empty() &&
         frameIndex >= records.front().FrameIndex && frameIndex <= records.back().FrameIndex) {

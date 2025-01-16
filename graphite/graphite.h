@@ -35,9 +35,16 @@
 
 #include "graphite/version.h"
 
+#include "carbon/carbon.h"
 #include "rgmui/rgmui.h"
 #include "rgmnes/nes.h"
+#include "rgmutil/util.h"
 #include "rgmvideo/video.h"
+
+namespace rgms::util {
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(Rect2F,
+    X, Y, Width, Height);
+}
 
 namespace graphite {
 
@@ -542,6 +549,7 @@ private:
 struct VideoConfig {
     int ScreenMultiplier;
     int OffsetMillis;
+    rgms::util::Rect2F CropRect;
     rgms::video::StaticVideoThreadConfig StaticVideoThreadCfg;
 
     static VideoConfig Defaults();
@@ -549,6 +557,7 @@ struct VideoConfig {
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(VideoConfig,
     ScreenMultiplier,
     OffsetMillis,
+    CropRect,
     StaticVideoThreadCfg
 );
 
@@ -685,6 +694,38 @@ private:
     static rgms::rgmui::IApplicationConfig ThisApplicationConfig();
     bool* m_WasExited;
     SDL_Window* m_Window;
+    GraphiteConfig* m_Config;
+};
+
+class GraphiteCropApp : public rgms::rgmui::IApplication {
+public:
+    GraphiteCropApp(bool* wasExited, GraphiteConfig* config);
+    ~GraphiteCropApp();
+
+    virtual bool OnSDLEvent(const SDL_Event& e) override;
+    virtual bool OnFrame() override;
+    virtual void OnFirstFrame() override;
+
+private:
+    void DrawFilterAnnotations(rgms::rgmui::MatAnnotator* mat,
+            const rgms::util::Rect2F& crop);
+    rgms::util::Vector2F HandleSize(int x, int y);
+    void SetupHandles();
+    void SelectHandleHotkeys();
+    void DrawHandles(rgms::rgmui::MatAnnotator* mat);
+    void DoFFMPEGCommand();
+
+private:
+    static rgms::rgmui::IApplicationConfig ThisApplicationConfig();
+    std::unique_ptr<rgms::video::StaticVideoThread> m_VideoThread;
+    int m_VideoFrame;
+    bool* m_WasExited;
+    rgms::video::LiveInputFramePtr m_LiveInputFrame;
+    float m_FrameMult;
+    std::vector<std::shared_ptr<carbon::IHandle>> m_Handles;
+    int m_SelectedHandle;
+    cv::Mat m_Image;
+    cv::Mat m_OutImage;
     GraphiteConfig* m_Config;
 };
 
