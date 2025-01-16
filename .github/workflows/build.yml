@@ -10,7 +10,7 @@ on:
 
 jobs:
   build_linux_x64:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
 
     steps:
       - name: Checkout Actions Repository
@@ -23,7 +23,7 @@ jobs:
           sudo apt-get update && \
           sudo apt install build-essential cmake git ninja-build \
             libavcodec-dev libavformat-dev libswscale-dev libv4l-dev \
-            mesa-common-dev xorg-dev libopencv-dev libfuse2
+            mesa-common-dev xorg-dev libopencv-dev libfuse2 libgtk-3-dev
 
       - name: Prepare build directory
         run: |
